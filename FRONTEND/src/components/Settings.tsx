@@ -65,6 +65,7 @@ export function Settings() {
             <div>
               <h2 className="text-2xl">Display & Accessibility</h2>
               <p className="text-sm text-muted-foreground">
+                
                 Adjust visual preferences for better readability
               </p>
             </div>
