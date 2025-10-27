@@ -54,7 +54,7 @@ export function AnalysisLoading() {
         if (prev >= 100) {
           clearInterval(progressInterval);
           // 4. Use the dynamic resultsPath for navigation
-          setTimeout(() => navigate(resultsPath), 1000); 
+          setTimeout(() => navigate(resultsPath, { replace: true }), 1000);
           return 100;
         }
         return prev + 1;

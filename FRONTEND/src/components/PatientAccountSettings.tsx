@@ -59,20 +59,8 @@ export function PatientAccountSettings() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          {/* 4. Updated Back button to use navigate */}
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl">Account Settings</h1>
-            <p className="text-muted-foreground">
-              Manage your account and preferences
-            </p>
-          </div>
-        </div>
+
+
 
         <div className="grid lg:grid-cols-4 gap-6">
           {/* Categories Sidebar */}

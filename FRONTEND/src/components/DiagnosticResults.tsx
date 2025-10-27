@@ -153,10 +153,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
           
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+
             <div>
               <h1 className="text-3xl">Diagnostic Results</h1>
               <p className="text-muted-foreground">
@@ -165,10 +162,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Save className="w-4 h-4 mr-2" />
-              Save Report
-            </Button>
+
             <Button variant="outline">
               <Download className="w-4 h-4 mr-2" />
               Export PDF

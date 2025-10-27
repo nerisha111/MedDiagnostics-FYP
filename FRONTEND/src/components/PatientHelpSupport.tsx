@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // 1. Import useNavigate
+import { useNavigate } from "react-router-dom";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import {
@@ -9,11 +9,10 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
-import { ArrowLeft, Search, HelpCircle, FileQuestion } from "lucide-react";
+import { Search, HelpCircle, FileQuestion } from "lucide-react";
 
-// 2. Removed the props interface
 export function PatientHelpSupport() {
-  const navigate = useNavigate(); // 3. Initialize the navigate function
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
   const faqs = [
@@ -73,7 +72,7 @@ export function PatientHelpSupport() {
         {
           question: "How long is my data stored?",
           answer:
-            "Your data is stored securely for as long as you maintain your account. You can delete any data at any time from your account settings.",
+            "Your data is stored securely for as long as you maintain your account.",
         },
       ],
     },
@@ -85,16 +84,7 @@ export function PatientHelpSupport() {
           answer:
             "Go to Account Settings from the sidebar menu. You can update your personal information, change your password, and manage your preferences.",
         },
-        {
-          question: "Can I delete my account?",
-          answer:
-            "Yes, you can delete your account from Account Settings. Please note that this action is permanent and will remove all your data from our systems.",
-        },
-        {
-          question: "I forgot my password. What should I do?",
-          answer:
-            "Click on 'Forgot Password' on the login page. Enter your email address, and we'll send you a link to reset your password.",
-        },
+
       ],
     },
   ];
@@ -109,89 +99,59 @@ export function PatientHelpSupport() {
   })).filter((category) => category.questions.length > 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-        
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl">Help & Support</h1>
+    // REMOVED: The outer <div className="min-h-screen bg-background"> and <div className="max-w-4xl ...">
+    // The component now returns a single div that only controls the vertical spacing of its direct children.
+    <div className="space-y-6">
+      {/* Search */}
+      <Card className="p-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input
+            placeholder="Search for help..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </Card>
+
+      {/* FAQ Sections */}
+      <div className="space-y-6">
+        {filteredFaqs.length === 0 ? (
+          <Card className="p-12 text-center">
+            <FileQuestion className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No results found</h3>
             <p className="text-muted-foreground">
-              Find answers to commonly asked questions
+              Try searching with different keywords.
             </p>
-          </div>
-        </div>
-
-        {/* Search */}
-        <Card className="p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Search for help..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </Card>
-
-        {/* FAQ Sections */}
-        <div className="space-y-6">
-          {filteredFaqs.length === 0 ? (
-            <Card className="p-12 text-center">
-              <FileQuestion className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl mb-2">No results found</h3>
-              <p className="text-muted-foreground">
-                Try searching with different keywords
-              </p>
-            </Card>
-          ) : (
-            filteredFaqs.map((category, idx) => (
-              <Card key={idx} className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <HelpCircle className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-xl">{category.category}</h2>
+          </Card>
+        ) : (
+          filteredFaqs.map((category, idx) => (
+            <Card key={idx} className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <HelpCircle className="w-5 h-5 text-primary" />
                 </div>
+                <h2 className="text-xl font-semibold">{category.category}</h2>
+              </div>
 
-                <Accordion type="single" collapsible className="w-full">
-                  {category.questions.map((faq, qIdx) => (
-                    <AccordionItem key={qIdx} value={`item-${idx}-${qIdx}`}>
-                      <AccordionTrigger className="text-left">
-                        {faq.question}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <p className="text-muted-foreground leading-relaxed">
-                          {faq.answer}
-                        </p>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </Card>
-            ))
-          )}
-        </div>
-
-        {/* User Guide Link */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg mb-1">Need more help?</h3>
-              <p className="text-sm text-muted-foreground">
-                Check out our comprehensive user guide for detailed instructions
-              </p>
-            </div>
-            <Button variant="outline" className="border-primary text-primary hover:bg-primary/10">
-              View User Guide
-            </Button>
-          </div>
-        </Card>
+              <Accordion type="single" collapsible className="w-full">
+                {category.questions.map((faq, qIdx) => (
+                  <AccordionItem key={qIdx} value={`item-${idx}-${qIdx}`}>
+                    <AccordionTrigger className="text-left font-medium text-base">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

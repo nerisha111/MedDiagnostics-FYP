@@ -1,4 +1,5 @@
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Home,
   Upload,
@@ -19,13 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-// Define the type for the component's props
-interface HealthcareLayoutProps {
-  children: React.ReactNode; // `children` will be the page content
-}
-
-// The layout component that includes the sidebar and top navigation
-export function HealthcareLayout({ children }: HealthcareLayoutProps) {
+export function HealthcareLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,12 +34,23 @@ export function HealthcareLayout({ children }: HealthcareLayoutProps) {
     { id: "settings", icon: Settings, label: "Settings", path: "/healthcare/settings" },
   ];
 
+  // This effect hook updates the browser tab title whenever the URL changes.
+  useEffect(() => {
+    const currentItem = menuItems.find(item => location.pathname.startsWith(item.path));
+
+    if (currentItem) {
+      document.title = `${currentItem.label} | MedDiagnostic Pro`;
+    } else {
+      document.title = "MedDiagnostic Pro"; // A fallback title
+    }
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar Navigation */}
-      <div className="w-64 bg-card border-r border-border flex-col hidden lg:flex">
+      <aside className="w-64 bg-card border-r border-border flex flex-col">
         <div className="p-6 border-b border-border">
-          <h2 className="text-xl">MedDiagnostic Pro</h2>
+          <h2 className="text-xl font-bold">MedDiagnostic Pro</h2>
           <p className="text-sm text-muted-foreground">Healthcare Portal</p>
         </div>
 
@@ -52,7 +58,7 @@ export function HealthcareLayout({ children }: HealthcareLayoutProps) {
           <ul className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname.startsWith(item.path);
               return (
                 <li key={item.id}>
                   <button
@@ -81,23 +87,19 @@ export function HealthcareLayout({ children }: HealthcareLayoutProps) {
             <span>Sign Out</span>
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Navigation Bar */}
-        <div className="bg-card border-b border-border px-6 py-4">
+        {/* Top Navigation Bar with Search */}
+        <header className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex-1 max-w-xl">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search patients, reports, guidelines..."
-                  className="pl-10"
-                />
+                <Input placeholder="Search patients, reports, guidelines..." className="pl-10" />
               </div>
             </div>
-
             <div className="flex items-center gap-4 ml-6">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -113,19 +115,24 @@ export function HealthcareLayout({ children }: HealthcareLayoutProps) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => navigate("/healthcare/settings")}>
-                    Settings
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/healthcare/settings")}>Settings</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/")}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Page specific content is rendered here */}
+        {/* 
+          THIS IS THE KEY CHANGE:
+          The <main> tag now provides the outer padding (p-8), 
+          and the inner <div> provides the max-width and centering.
+          The Outlet is placed inside, so all pages inherit this structure.
+        */}
         <main className="flex-1 overflow-y-auto p-8">
-          {children}
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

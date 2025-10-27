@@ -125,18 +125,7 @@ export function PatientDataUpload() {
   return (
    
     <div className="max-w-7xl mx-auto p-8 space-y-6">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Upload Your Medical Data</h1>
-          <p className="text-muted-foreground">Securely upload your data for analysis.</p>
-        </div>
-        {/* ADJUSTMENT: Navigation points back to the patient dashboard */}
-        <Button variant="outline" onClick={() => navigate('/patient/dashboard')}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </Button>
-      </header>
+
 
       
       <Card className="p-6">

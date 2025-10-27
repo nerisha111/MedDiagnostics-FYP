@@ -193,11 +193,7 @@ export function HealthcareFeedbackSystem() {
       <div className="max-w-7xl mx-auto p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          {/* 4. Updated Back button to use navigate */}
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
+
           <div className="flex-1">
             <h1 className="text-3xl">Feedback System</h1>
             <p className="text-muted-foreground">

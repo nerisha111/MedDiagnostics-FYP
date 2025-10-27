@@ -153,11 +153,7 @@ export function ReportHistory() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* 4. Updated Back button to use navigate */}
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+
             <div>
               <h1 className="text-3xl">Diagnostic Reports</h1>
               <p className="text-muted-foreground">

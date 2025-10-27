@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom"; // 1. Import hooks
+import { useNavigate } from "react-router-dom";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Table,
   TableBody,
@@ -19,15 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import {
-  Home,
-  Upload,
-  Users,
-  FileText,
-  BookOpen,
-  MessageSquare,
-  Settings,
-  Search,
-  ChevronDown,
   TrendingUp,
   TrendingDown,
   Eye,
@@ -36,25 +27,13 @@ import {
   MoreVertical,
   Plus,
   AlertCircle,
-  LogOut, // Added for clarity in sign-out button
+  FileText,
+  Calendar,
 } from "lucide-react";
 import { Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
 
-// 2. Removed the props interface
 export function HealthcareProfessionalDashboard() {
-  const navigate = useNavigate(); // 3. Initialize navigate
-  const location = useLocation(); // 4. Initialize location to track the current path
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const menuItems = [
-    { id: "dashboard", icon: Home, label: "Dashboard", path: "/healthcare/dashboard" },
-    { id: "upload", icon: Upload, label: "Upload Data", path: "/healthcare/upload" },
-    { id: "patients", icon: Users, label: "Patient Management", path: "/healthcare/compare" },
-    { id: "reports", icon: FileText, label: "Diagnostic Reports", path: "/healthcare/history" },
-    { id: "guidelines", icon: BookOpen, label: "Clinical Guidelines", path: "/healthcare/guidelines" },
-    { id: "feedback", icon: MessageSquare, label: "Feedback System", path: "/healthcare/feedback" },
-    { id: "settings", icon: Settings, label: "Settings", path: "/healthcare/settings" },
-  ];
+  const navigate = useNavigate();
 
   // Mock data (remains unchanged)
   const metrics = [
@@ -148,242 +127,272 @@ export function HealthcareProfessionalDashboard() {
     { name: "Other", value: 17, color: "#64748b" },
   ];
 
+  // Helper to render the table (avoids code duplication in Tabs)
+  const CasesTable = ({ filter }: { filter: string }) => {
+    const filteredCases = filter === 'all' 
+      ? recentCases 
+      : recentCases.filter(c => filter === 'pending' ? c.status === 'Pending Review' : c.status === 'Complete');
+      
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Patient ID</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Data Types</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Diagnosis</TableHead>
+            <TableHead>Confidence</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredCases.map((caseItem) => (
+            <TableRow key={caseItem.id}>
+              <TableCell className="font-medium">{caseItem.id}</TableCell>
+              <TableCell className="text-muted-foreground">{caseItem.date}</TableCell>
+              <TableCell>
+                <div className="flex gap-1 flex-wrap">
+                  {caseItem.dataTypes.map((type) => (
+                    <Badge key={type} variant="secondary" className="font-normal">
+                      {type}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={caseItem.status === "Complete" ? "default" : "secondary"}
+                  className={caseItem.status === "Pending Review" ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : ""}
+                >
+                  {caseItem.status}
+                </Badge>
+              </TableCell>
+              <TableCell>{caseItem.diagnosis}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${caseItem.confidence > 90 ? "bg-green-500" : caseItem.confidence > 80 ? "bg-amber-500" : "bg-red-500"}`} />
+                  {caseItem.confidence}%
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate('/healthcare/results')}>
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <FileEdit className="w-4 h-4 mr-2" />
+                      Edit Diagnosis
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar Navigation */}
-      <div className="w-64 bg-card border-r border-border flex flex-col">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-xl">MedDiagnostic Pro</h2>
-          <p className="text-sm text-muted-foreground">Healthcare Portal</p>
+    <div className="space-y-8">
+      {/* Header with Actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <div className="flex items-center gap-2 text-muted-foreground mt-1">
+            <Calendar className="w-4 h-4" />
+            <span className="text-sm">October 25, 2024</span>
+          </div>
         </div>
-
-        <nav className="flex-1 p-4">
-          <ul className="space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              
-              const isActive = location.pathname === item.path;
-              return (
-                <li key={item.id}>
-                  <button
-                    
-                    onClick={() => navigate(item.path)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent text-foreground"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="p-4 border-t border-border">
-          <button
-            
-            onClick={() => navigate('/')}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Sign Out</span>
-          </button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Summary
+          </Button>
+          <Button onClick={() => navigate("/healthcare/upload")} className="bg-primary hover:bg-primary/90">
+            <Plus className="w-4 h-4 mr-2" />
+            New Case Analysis
+          </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Navigation Bar */}
-        <div className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 max-w-xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search patients, reports, guidelines..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center gap-4 ml-6">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 px-3 py-2 hover:bg-accent rounded-lg transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary text-sm">DR</span>
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm">Dr. Sarah Johnson</p>
-                      <p className="text-xs text-muted-foreground">Healthcare Professional</p>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {/* 8. Updated dropdown navigation */}
-                  <DropdownMenuItem onClick={() => navigate("/healthcare/settings")}>
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/")}>Logout</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
 
-        {/* Dashboard Content */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl">Dashboard</h1>
-                <p className="text-muted-foreground">
-                  Welcome back, Dr. Johnson
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {metrics.map((metric, index) => (
+          <Card key={index} className="p-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {metric.title}
                 </p>
+                {metric.trend && (
+                  <Badge 
+                    variant="secondary" 
+                    className={`font-normal ${metric.trend === "up" ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50"}`}
+                  >
+                    <span className="flex items-center gap-1">
+                      {metric.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {metric.change}
+                    </span>
+                  </Badge>
+                )}
               </div>
-              <Button
-                // 9. Updated button navigation
-                onClick={() => navigate("/healthcare/upload")}
-                className="bg-primary hover:bg-primary/90"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Case Analysis
-              </Button>
-            </div>
-
-            {/* Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {metrics.map((metric, index) => (
-                <Card key={index} className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">{metric.title}</p>
-                      {metric.trend && (
-                        <span
-                          className={`text-xs flex items-center gap-1 ${
-                            metric.trend === "up" ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {metric.trend === "up" ? (
-                            <TrendingUp className="w-3 h-3" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3" />
-                          )}
-                          {metric.change}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-3xl">{metric.value}</p>
-                        {metric.urgent && (
-                          <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {metric.urgent} urgent
-                          </p>
-                        )}
-                      </div>
-                      {metric.chartData && (
-                        <div className="w-20 h-10">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={metric.chartData.map((v, i) => ({ value: v }))}>
-                              <Line
-                                type="monotone"
-                                dataKey="value"
-                                stroke="#0f766e"
-                                strokeWidth={2}
-                                dot={false}
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                      {metric.progress && (
-                        <div className="relative w-16 h-16">
-                          <svg className="w-16 h-16 transform -rotate-90">
-                            <circle
-                              cx="32"
-                              cy="32"
-                              r="28"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                              fill="none"
-                              className="text-muted"
-                            />
-                            <circle
-                              cx="32"
-                              cy="32"
-                              r="28"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                              fill="none"
-                              strokeDasharray={`${metric.progress * 1.76} 176`}
-                              className="text-primary"
-                            />
-                          </svg>
-                        </div>
-                      )}
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-3xl font-bold">{metric.value}</p>
+                  {metric.urgent && (
+                    <p className="text-sm font-medium text-red-600 mt-1 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4" />
+                      {metric.urgent} require attention
+                    </p>
+                  )}
+                </div>
+                {metric.chartData && (
+                  <div className="w-24 h-12">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metric.chartData.map((v) => ({ value: v }))}>
+                        <Line type="monotone" dataKey="value" stroke="#0f766e" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                {metric.progress && (
+                  <div className="relative w-14 h-14">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none" className="text-muted/20" />
+                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray={`${metric.progress * 1.76} 176`} className="text-primary" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-medium">
+                      {Math.floor(metric.progress)}%
                     </div>
                   </div>
-                </Card>
-              ))}
+                )}
+              </div>
             </div>
+          </Card>
+        ))}
+      </div>
 
-            {/* Charts Section */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Accuracy Over Time */}
-              <Card className="lg:col-span-2 p-6">
-                <h3 className="mb-4">Diagnostic Accuracy Over Time</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={accuracyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" stroke="#64748b" />
-                    <YAxis stroke="#64748b" domain={[85, 100]} />
-                    <RechartsTooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="accuracy"
-                      stroke="#0f766e"
-                      strokeWidth={3}
-                      dot={{ fill: "#0f766e", r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Card>
+      {/* Charts Section */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="font-semibold">Diagnostic Accuracy Trends</h3>
+              <p className="text-sm text-muted-foreground">6-month performance overview</p>
+            </div>
+            <Select defaultValue="6m">
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1m">Last Month</SelectItem>
+                <SelectItem value="6m">Last 6 Months</SelectItem>
+                <SelectItem value="1y">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={accuracyData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#64748b" domain={[80, 100]} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} />
+              <RechartsTooltip 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+              />
+              <Line type="monotone" dataKey="accuracy" stroke="#0f766e" strokeWidth={3} dot={{ fill: "#ffffff", stroke: "#0f766e", strokeWidth: 2, r: 4 }} activeDot={{ r: 6, fill: "#0f766e" }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
 
-              {/* Diagnosis Distribution */}
-                            <Card className="p-6">
-                              <h3 className="mb-4">Cases by Category</h3>
-                              <ResponsiveContainer width="100%" height={250}>
-                                <PieChart>
-                                  <Pie
-                                    data={diagnosisDistribution}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                  >
-                                    {diagnosisDistribution.map((entry) => (
-                                      <Cell key={entry.name} fill={entry.color} />
-                                    ))}
-                                  </Pie>
-                                </PieChart>
-                              </ResponsiveContainer>
-                            </Card>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
+        <Card className="p-6 flex flex-col">
+          <h3 className="font-semibold mb-1">Case Distribution</h3>
+          <p className="text-sm text-muted-foreground mb-6">By medical category</p>
+          <div className="flex-1 min-h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={diagnosisDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {diagnosisDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            {diagnosisDistribution.map((item) => (
+              <div key={item.name} className="flex items-center gap-2 text-sm">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-muted-foreground truncate">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Tabbed Case Management - A more professional way to handle data */}
+      <Card className="overflow-hidden">
+        <Tabs defaultValue="all" className="w-full">
+          <div className="p-6 border-b flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="text-lg font-semibold">Case Management</h3>
+              <p className="text-sm text-muted-foreground">Manage and review your recent patient cases</p>
+            </div>
+            <TabsList>
+              <TabsTrigger value="all">All Cases</TabsTrigger>
+              <TabsTrigger value="pending">
+                Needs Review
+                <Badge variant="secondary" className="ml-2 bg-amber-100 text-amber-800 hover:bg-amber-100">2</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="all" className="m-0">
+            <CasesTable filter="all" />
+          </TabsContent>
+          <TabsContent value="pending" className="m-0">
+            <CasesTable filter="pending" />
+          </TabsContent>
+          <TabsContent value="completed" className="m-0">
+            <CasesTable filter="completed" />
+          </TabsContent>
+
+          <div className="p-4 border-t bg-muted/50 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Showing most recent 5 cases</p>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/healthcare/history')}>
+              View Full History
+              <TrendingUp className="w-4 h-4 ml-2 rotate-90" />
+            </Button>
+          </div>
+        </Tabs>
+      </Card>
+    </div>
+  );
+}
+
+// You'll need to add these imports at the top if you don't have them already:
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";

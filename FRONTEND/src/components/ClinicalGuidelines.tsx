@@ -146,11 +146,7 @@ export function ClinicalGuidelines() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-           
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+
             <div>
               <h1 className="text-3xl">Clinical Guidelines Database</h1>
               <p className="text-muted-foreground">

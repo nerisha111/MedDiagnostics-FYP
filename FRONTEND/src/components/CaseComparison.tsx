@@ -120,11 +120,7 @@ export function CaseComparison() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* 4. Updated Back button to use navigate */}
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+
             <div>
               <h1 className="text-3xl">Case Comparison</h1>
               <p className="text-muted-foreground">
@@ -139,19 +135,7 @@ export function CaseComparison() {
             <Button variant="outline" onClick={findDifferences}>
               Show Differences
             </Button>
-            <Button variant="outline" onClick={() => setExpandedView(!expandedView)}>
-              {expandedView ? (
-                <>
-                  <Minimize2 className="w-4 h-4 mr-2" />
-                  Normal View
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-4 h-4 mr-2" />
-                  Expand View
-                </>
-              )}
-            </Button>
+
             <Button>
               <FileText className="w-4 h-4 mr-2" />
               Export Comparison

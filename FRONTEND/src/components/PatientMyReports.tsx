@@ -126,22 +126,7 @@ export function PatientMyReports() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {/* 4. Updated Back button to use navigate */}
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-3xl">My Reports</h1>
-              <p className="text-muted-foreground">
-                View and manage your medical analysis reports
-              </p>
-            </div>
-          </div>
-        </div>
+
 
         {/* Search and Filters */}
         <Card className="p-6">

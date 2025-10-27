@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 
 export function Settings() {
-  const navigate = useNavigate(); // 3. Initialize the navigate function
+  const navigate = useNavigate();
   const [fontSize, setFontSize] = useState(16);
   const [theme, setTheme] = useState("light");
 
@@ -47,10 +47,6 @@ export function Settings() {
         {/* Header */}
         <div className="flex items-center gap-4">
         
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
           <div>
             <h1 className="text-3xl">Settings & Preferences</h1>
             <p className="text-muted-foreground">
@@ -196,7 +192,7 @@ export function Settings() {
 
           {/* Save Button */}
           <div className="flex justify-end gap-3 pt-4">
-            {/* 5. Updated Cancel button to use navigate */}
+          
             <Button variant="outline" onClick={() => navigate(-1)}>
               Cancel
             </Button>
