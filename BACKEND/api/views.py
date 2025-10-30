@@ -4,6 +4,7 @@ from rest_framework import generics
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import (
     User, Patient, Clinician, Model, Clinicalguideline,
@@ -16,6 +17,7 @@ from .serializers import (
     ClinicianRegistrationSerializer,
     PatientRegistrationSerializer
 )
+from .permissions import IsOwner
 
 # ==============================================================================
 # Custom Views (Not Tied to Models)
@@ -23,8 +25,9 @@ from .serializers import (
 
 class RoleSelectionAPIView(APIView):
     """
-    A custom API view to provide role information for the frontend selection screen.
+    A public API view to provide role information for the frontend.
     """
+    permission_classes = [AllowAny]
     def get(self, request, format=None):
         roles = [
             {
@@ -54,6 +57,7 @@ class UserListAPIView(generics.ListAPIView):
 class UserDetailAPIView(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsOwner]
 
 # --- Patient Profiles ---
 class PatientListAPIView(generics.ListAPIView):
@@ -63,6 +67,7 @@ class PatientListAPIView(generics.ListAPIView):
 class PatientDetailAPIView(generics.RetrieveAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
+    permission_classes = [IsOwner]
 
 # --- Clinician Profiles ---
 class ClinicianListAPIView(generics.ListAPIView):
@@ -72,20 +77,40 @@ class ClinicianListAPIView(generics.ListAPIView):
 class ClinicianDetailAPIView(generics.RetrieveAPIView):
     queryset = Clinician.objects.all()
     serializer_class = ClinicianSerializer
+    permission_classes = [IsOwner]
 
 # --- Diagnostic Cases ---
 class DiagnosticCaseListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Diagnosticcase.objects.all()
     serializer_class = DiagnosticCaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Diagnosticcase.objects.filter(created_by=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 class DiagnosticCaseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Diagnosticcase.objects.all()
     serializer_class = DiagnosticCaseSerializer
+    # In production, add IsOwner permission here too.
 
 # --- Diagnostic Inputs ---
 class DiagnosticInputListCreateAPIView(generics.ListCreateAPIView):
     queryset = Diagnosticinput.objects.all()
     serializer_class = DiagnosticInputSerializer
+
+class DiagnosticInputBulkCreateAPIView(generics.CreateAPIView):
+    queryset = Diagnosticinput.objects.all()
+    serializer_class = DiagnosticInputSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class DiagnosticInputDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Diagnosticinput.objects.all()
@@ -132,12 +157,9 @@ class ClinicalGuidelineDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 # ==============================================================================
 
 class ClinicianRegistrationAPIView(generics.CreateAPIView):
-    """
-    API endpoint for registering a new clinician.
-    """
     queryset = Clinician.objects.all()
     serializer_class = ClinicianRegistrationSerializer
-    permission_classes = []
+    permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -147,12 +169,7 @@ class ClinicianRegistrationAPIView(generics.CreateAPIView):
             'medical_license_number': data.get('medical_license_number')
         }
         serializer = self.get_serializer(data=data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as e:
-            print("\n>>> CLINICIAN REGISTRATION VALIDATION ERROR:", serializer.errors)
-            print(">>> RAW DATA RECEIVED:", request.data)
-            raise e
+        serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(
             {"message": "Clinician registered successfully."},
@@ -161,12 +178,9 @@ class ClinicianRegistrationAPIView(generics.CreateAPIView):
 
 
 class PatientRegistrationAPIView(generics.CreateAPIView):
-    """
-    API endpoint for registering a new patient.
-    """
     queryset = Patient.objects.all()
     serializer_class = PatientRegistrationSerializer
-    permission_classes = []
+    permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -175,12 +189,7 @@ class PatientRegistrationAPIView(generics.CreateAPIView):
             'address': data.get('address')
         }
         serializer = self.get_serializer(data=data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as e:
-            print("\n>>> PATIENT REGISTRATION VALIDATION ERROR:", serializer.errors)
-            print(">>> RAW DATA RECEIVED:", request.data)
-            raise e
+        serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(
             {"message": "Patient registered successfully."},

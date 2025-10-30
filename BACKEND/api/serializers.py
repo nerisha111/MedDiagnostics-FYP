@@ -63,7 +63,18 @@ class DiagnosticCaseSerializer(serializers.ModelSerializer):
 class DiagnosticInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = Diagnosticinput
-        fields = '__all__'
+        # List all fields that the frontend will send
+        fields = [
+            'id',
+            'diagnostic_case',
+            'input_type',
+            'description',
+            'file_url',
+            'file_name',
+            'file_size',
+            'upload_date'
+        ]
+        read_only_fields = ['id', 'upload_date']
 
 class DiagnosisSerializer(serializers.ModelSerializer):
     model_details = ModelSerializer(source='model_used', read_only=True)

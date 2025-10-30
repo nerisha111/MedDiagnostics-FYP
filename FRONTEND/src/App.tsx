@@ -61,7 +61,7 @@ function handleNoteAdded(newNote: Note) {
 
   return (
     <>
-      <Router>
+      
         <Routes>
           {/* --- GENERAL AND STANDALONE ROUTES (NO SIDEBAR) --- */}
           <Route path="/" element={<RoleSelection />} />
@@ -108,7 +108,7 @@ function handleNoteAdded(newNote: Note) {
           {/*catch-all route for 404 Not Found */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-      </Router>
+      
 
       <FeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
       <Toaster />

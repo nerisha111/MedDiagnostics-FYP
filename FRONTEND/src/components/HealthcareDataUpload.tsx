@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "./ui/card";
+import axios from "axios";
+import { supabase } from "../supabaseClient";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -41,24 +43,33 @@ import {
   ChevronDown,
   Eye,
   Save,
-  ArrowRight,
+  Loader2,
+  ArrowRight
 } from "lucide-react";
 import { toast } from "sonner";
+import { Session } from "@supabase/supabase-js";
 
+// --- UPDATED INTERFACE ---
 interface UploadedFile {
+  file: File;
   name: string;
   size: number;
   progress: number;
   status: "uploading" | "success" | "error";
-  validation: {
-    integrity: boolean;
-    format: boolean;
-    quality: number;
+  storagePath?: string;
+  validation?: {
+    formatOk: boolean;
+    sizeOk: boolean;
+    qualityScore: number;
+    error?: string; 
   };
 }
 
 export function HealthcareDataUpload() {
   const navigate = useNavigate();
+  const [clinicianProfile, setClinicianProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [patientInfoOpen, setPatientInfoOpen] = useState(true);
   const [patientId, setPatientId] = useState("PT-2024-" + Math.floor(Math.random() * 1000).toString().padStart(3, "0"));
   const [dob, setDob] = useState("");
@@ -82,7 +93,120 @@ export function HealthcareDataUpload() {
     { id: "genetic", label: "Genetic Data", icon: Dna, formats: "VCF, BAM, FASTQ", maxSize: "50MB" },
   ];
 
-  // --- All handlers remain unchanged ---
+  // --- VALIDATION AND HELPER FUNCTIONS ---
+  const parseSize = (sizeStr: string): number => {
+    const unit = sizeStr.slice(-2).toUpperCase();
+    const value = parseFloat(sizeStr.slice(0, -2));
+    if (unit === 'MB') return value * 1024 * 1024;
+    if (unit === 'KB') return value * 1024;
+    return value;
+  };
+
+  const validateFile = (file: File, category: string) => {
+    const zone = uploadZones.find(z => z.id === category)!;
+    const allowedFormats = zone.formats.toLowerCase().split(', ');
+    const maxSize = parseSize(zone.maxSize);
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+
+    const formatOk = allowedFormats.includes(extension);
+    const sizeOk = file.size <= maxSize;
+    
+    if (!formatOk) {
+      return { formatOk, sizeOk, qualityScore: 0, error: `Invalid format. Expected: ${zone.formats}` };
+    }
+    if (!sizeOk) {
+      return { formatOk, sizeOk, qualityScore: 0, error: `File exceeds max size of ${zone.maxSize}` };
+    }
+
+    let qualityScore = 80; 
+    qualityScore += Math.floor(Math.random() * 20); 
+    if (category === 'images' && file.size < 500 * 1024) { qualityScore -= 10; }
+    if (extension === 'dicom') { qualityScore = Math.min(100, qualityScore + 10); }
+    
+    return { formatOk, sizeOk, qualityScore: Math.max(0, Math.min(100, qualityScore)) };
+  };
+
+    useEffect(() => {
+    const fetchClinicianData = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session) {
+          toast.error("You are not logged in.");
+          navigate('/healthcare/login');
+          return;
+        }
+        const token = session.access_token;
+        const userId = session.user.id;
+        const response = await axios.get(
+          `/api/clinicians/${userId}/`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        setClinicianProfile(response.data);
+      } catch (error) {
+        console.error("Failed to fetch clinician data:", error);
+        toast.error("Could not fetch your profile. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchClinicianData();
+  }, [navigate]);  
+
+  const handleProceedToAnalysis = async () => {
+    setIsSubmitting(true);
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) throw new Error("Authentication error. Please log in again.");
+
+      const token = session.access_token;
+      
+      const caseData = {
+        status: "Pending Analysis",
+        description: `Chief Complaint: ${chiefComplaint}\n\nMedical History: ${medicalHistory}`,
+        profile_info: {
+          patient_id: patientId,
+          date_of_birth: dob,
+          gender: gender,
+        }
+      };
+      const caseResponse = await axios.post('/api/cases/', caseData, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const caseId = caseResponse.data.id;
+      
+      const allFilesData = Object.entries(files).flatMap(([category, fileArray]) => 
+        fileArray
+          .filter(f => f.status === 'success' && f.storagePath)
+          .map(f => {
+            const { data: { publicUrl } } = supabase.storage.from('medical_records').getPublicUrl(f.storagePath!);
+            return {
+              diagnostic_case: caseId,
+              input_type: category,
+              file_name: f.name,
+              file_size: f.size,
+              file_url: publicUrl,
+            };
+          })
+      );
+
+      if (allFilesData.length > 0) {
+        await axios.post('/api/inputs/bulk-create/', allFilesData, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      
+      toast.success("Diagnostic case and records created successfully!");
+      navigate('/loading');
+
+    } catch (error: any) {
+      console.error("Failed to create diagnostic case and records:", error);
+      toast.error(error.response?.data?.detail || "Failed to create the case and save records.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };  
+
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDob(value);
@@ -111,39 +235,60 @@ export function HealthcareDataUpload() {
       handleFiles(Array.from(e.target.files), activeTab);
     }
   };
-  const handleFiles = (fileList: File[], category: string) => {
-    fileList.forEach((file) => {
-      const newFile: UploadedFile = {
+
+  const handleFiles = async (fileList: File[], category: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("You must be logged in to upload files.");
+      return;
+    }
+
+    const newUploads = fileList.map((file) => {
+      const validation = validateFile(file, category);
+      const initialStatus = validation.error ? 'error' : 'uploading';
+
+      if (validation.error) {
+        toast.error(`${file.name}: ${validation.error}`);
+      }
+
+      return {
+        file,
         name: file.name,
         size: file.size,
         progress: 0,
-        status: "uploading",
-        validation: { integrity: false, format: false, quality: 0 },
+        status: initialStatus as "uploading" | "success" | "error",
+        validation,
       };
-      setFiles((prev) => ({ ...prev, [category]: [...prev[category], newFile] }));
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 15;
-        if (progress >= 100) {
-          clearInterval(interval);
-          setFiles((prev) => ({
-            ...prev,
-            [category]: prev[category].map((f) =>
-              f.name === file.name
-                ? { ...f, progress: 100, status: "success", validation: { integrity: true, format: true, quality: Math.floor(Math.random() * 20) + 80 } }
-                : f
-            ),
-          }));
-          toast.success(`${file.name} uploaded and validated`);
-        } else {
-          setFiles((prev) => ({
-            ...prev,
-            [category]: prev[category].map((f) => (f.name === file.name ? { ...f, progress } : f)),
-          }));
-        }
-      }, 150);
+    });
+
+    setFiles((prev) => ({ ...prev, [category]: [...prev[category], ...newUploads] }));
+
+    newUploads.forEach(async (upload) => {
+      if (upload.status !== 'uploading') return;
+
+      const filePath = `${session.user.id}/${category}/${Date.now()}_${upload.name}`;
+      const { error } = await supabase.storage.from('medical_records').upload(filePath, upload.file);
+
+      if (error) {
+        setFiles((prev) => {
+          const updatedCategory = prev[category].map((f) =>
+            f.name === upload.name ? { ...f, status: 'error' as const, validation: { ...f.validation!, error: error.message } } : f
+          );
+          return { ...prev, [category]: updatedCategory };
+        });
+        toast.error(`Upload failed for ${upload.name}`);
+      } else {
+        setFiles((prev) => {
+          const updatedCategory = prev[category].map((f) =>
+            f.name === upload.name ? { ...f, status: 'success' as const, progress: 100, storagePath: filePath } : f
+          );
+          return { ...prev, [category]: updatedCategory };
+        });
+        toast.success(`${upload.name} uploaded successfully.`);
+      }
     });
   };
+  
   const removeFile = (category: string, fileName: string) => {
     setFiles((prev) => ({ ...prev, [category]: prev[category].filter((f) => f.name !== fileName) }));
     toast.info(`${fileName} removed`);
@@ -154,8 +299,17 @@ export function HealthcareDataUpload() {
   };
 
   const totalFiles = Object.values(files).reduce((sum, arr) => sum + arr.length, 0);
-  const validatedFiles = Object.values(files).flat().filter((f) => f.status === "success").length;
+  const successfulFiles = Object.values(files).flat().filter(f => f.status === 'success' && f.validation);
+  const validatedFiles = successfulFiles.length;
   const hasErrors = Object.values(files).flat().some((f) => f.status === "error");
+
+  const overallQuality = successfulFiles.length > 0
+    ? Math.round(successfulFiles.reduce((sum, f) => sum + f.validation!.qualityScore, 0) / successfulFiles.length)
+    : 0;
+
+   if (isLoading) {
+    return <div className="p-6">Loading your information...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -166,12 +320,15 @@ export function HealthcareDataUpload() {
           <BreadcrumbItem><BreadcrumbPage>Upload Data</BreadcrumbPage></BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-
-    
-
+      
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Upload Patient Data</h1>
+          {clinicianProfile && (
+            <p className="text-muted-foreground">
+              Welcome, Dr. {clinicianProfile.user_details.first_name} {clinicianProfile.user_details.last_name}
+            </p>
+          )}
         </div>
       </div>
 
@@ -241,12 +398,16 @@ export function HealthcareDataUpload() {
                               <p className="truncate text-sm font-medium">{file.name}</p>
                               <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                               {file.status === "uploading" && <Progress value={file.progress} className="h-1 mt-2" />}
-                              {file.status === "success" && (
+                              
+                              {file.status === "success" && file.validation && (
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1.5">
-                                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-500" />Integrity</span>
-                                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-500" />Format</span>
-                                  <span>Quality: {file.validation.quality}%</span>
+                                  <span className={`flex items-center gap-1 ${file.validation.formatOk ? 'text-green-500' : 'text-destructive'}`}><CheckCircle2 className="w-3 h-3" />Format OK</span>
+                                  <span className={`flex items-center gap-1 ${file.validation.sizeOk ? 'text-green-500' : 'text-destructive'}`}><CheckCircle2 className="w-3 h-3" />Size OK</span>
+                                  <span>Quality: {file.validation.qualityScore}%</span>
                                 </div>
+                              )}
+                              {file.status === "error" && file.validation?.error && (
+                                <p className="text-xs text-destructive mt-1.5">{file.validation.error}</p>
                               )}
                             </div>
                             <div className="flex gap-1">
@@ -269,8 +430,11 @@ export function HealthcareDataUpload() {
             <h3 className="font-semibold mb-4">Data Quality Overview</h3>
             <div className="space-y-4">
               <div>
-                <div className="flex items-center justify-between text-sm mb-2"><span className="text-muted-foreground">Overall Quality</span><span>{validatedFiles > 0 ? Math.round(Object.values(files).flat().filter((f) => f.status === "success").reduce((sum, f) => sum + f.validation.quality, 0) / validatedFiles) : 0}%</span></div>
-                <Progress value={validatedFiles > 0 ? Object.values(files).flat().filter((f) => f.status === "success").reduce((sum, f) => sum + f.validation.quality, 0) / validatedFiles : 0}/>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Overall Quality</span>
+                  <span>{overallQuality}%</span>
+                </div>
+                <Progress value={overallQuality}/>
               </div>
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Files Uploaded</span><span>{totalFiles}</span></div>
@@ -290,14 +454,22 @@ export function HealthcareDataUpload() {
             {hasErrors && <span className="text-destructive ml-2">• {Object.values(files).flat().filter((f) => f.status === "error").length} error{Object.values(files).flat().filter((f) => f.status === "error").length !== 1 ? "s" : ""}</span>}
           </div>
           <div className="flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button variant="outline" className="flex-1 sm:flex-auto">
+            <Button variant="outline" className="flex-1 sm:flex-auto" disabled={isSubmitting}>
               <Save className="w-4 h-4 mr-2" />Save as Draft
             </Button>
-            <Button variant="outline" onClick={clearAll} disabled={totalFiles === 0} className="flex-1 sm:flex-auto">
+            <Button variant="outline" onClick={clearAll} disabled={totalFiles === 0 || isSubmitting} className="flex-1 sm:flex-auto">
               Clear All
             </Button>
-            <Button onClick={() => navigate('/loading')} disabled={validatedFiles === 0 || hasErrors} className="bg-primary hover:bg-primary/90 flex-1 sm:flex-auto">
-              Proceed to Analysis<ArrowRight className="w-4 h-4 ml-2" />
+            <Button 
+              onClick={handleProceedToAnalysis} 
+              disabled={validatedFiles === 0 || hasErrors || isSubmitting} 
+              className="bg-primary hover:bg-primary/90 flex-1 sm:flex-auto"
+            >
+              {isSubmitting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+              ) : (
+                <>Proceed to Analysis<ArrowRight className="w-4 h-4 ml-2" /></>
+              )}
             </Button>
           </div>
         </div>

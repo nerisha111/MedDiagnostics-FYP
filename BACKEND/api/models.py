@@ -15,6 +15,26 @@ class User(models.Model):
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     
+    # --- THIS IS THE ONLY CHANGE ---
+    # These properties make our custom User model compatible with Django's
+    # built-in permission checks (like IsAuthenticated).
+
+    @property
+    def is_authenticated(self):
+        """
+        Always return True. If a user instance exists and is attached to the request,
+        it means our SupabaseAuthentication class has already validated them.
+        """
+        return True
+
+    @property
+    def is_active(self):
+        """
+        You could add custom logic here to deactivate users if needed.
+        For now, we'll consider all existing users to be active.
+        """
+        return True
+    # --- END OF CHANGE ---
 
     class Meta:
         managed = False
@@ -115,14 +135,15 @@ class Diagnosticcase(models.Model):
 
 
 class Diagnosticinput(models.Model):
-    id = models.OneToOneField(Diagnosticcase, models.CASCADE, db_column='id', primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    diagnostic_case = models.ForeignKey(Diagnosticcase, models.CASCADE)
     input_type = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     file_url = models.URLField(max_length=1024, blank=True, null=True)
     file_name = models.CharField(max_length=255, blank=True, null=True)
-    file_size = models.BigIntegerField(blank=True, null=True) # BinaryField is not appropriate for size
+    file_size = models.BigIntegerField(blank=True, null=True)
     upload_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-
+    
     class Meta:
         managed = False
         db_table = 'DiagnosticInput'
@@ -133,8 +154,8 @@ class Diagnosticinput(models.Model):
 
 
 class Diagnosis(models.Model):
-    id = models.OneToOneField(Diagnosticcase, models.CASCADE, db_column='id', primary_key=True) # Changed from Model to Diagnosticcase
-    model_used = models.ForeignKey(Model, models.PROTECT, blank=True, null=True) # Added link to the model used
+    id = models.OneToOneField(Diagnosticcase, models.CASCADE, db_column='id', primary_key=True)
+    model_used = models.ForeignKey(Model, models.PROTECT, blank=True, null=True)
     diagnosis_date = models.DateField(auto_now_add=True, blank=True, null=True)
     probable_condition = models.CharField(max_length=255, blank=True, null=True)
     confidence_score = models.FloatField(blank=True, null=True)
@@ -152,8 +173,8 @@ class Diagnosis(models.Model):
 
 
 class Recommendation(models.Model):
-    id = models.OneToOneField(Diagnosis, models.CASCADE, db_column='id', primary_key=True) # Changed from Guideline to Diagnosis
-    guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True) # Added link to guideline
+    id = models.OneToOneField(Diagnosis, models.CASCADE, db_column='id', primary_key=True)
+    guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True)
     recommended_text = models.TextField(blank=True, null=True)
     generated_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     is_reviewed = models.BooleanField(default=False, blank=True, null=True)

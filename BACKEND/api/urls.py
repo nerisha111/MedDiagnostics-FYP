@@ -31,4 +31,7 @@ urlpatterns = [
     path('guidelines/<uuid:pk>/', views.ClinicalGuidelineDetailAPIView.as_view(), name='guideline-detail'),
     path('register/clinician/', views.ClinicianRegistrationAPIView.as_view(), name='clinician-register'),
     path('register/patient/', views.PatientRegistrationAPIView.as_view(), name='patient-register'),
+    path('inputs/bulk-create/', views.DiagnosticInputBulkCreateAPIView.as_view(), name='input-bulk-create'),
+    path('inputs/<uuid:pk>/', views.DiagnosticInputDetailAPIView.as_view(), name='input-detail'),
+    path('inputs/', views.DiagnosticInputListCreateAPIView.as_view(), name='input-list-create')
 ]
