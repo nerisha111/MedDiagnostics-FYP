@@ -1,5 +1,7 @@
 import { useState } from "react";
+import axios from "axios"; 
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -12,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { ArrowLeft, Stethoscope, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Stethoscope, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -54,6 +56,10 @@ export function HealthcareProfessionalRegistration() {
     password: false,
     confirmPassword: false,
   });
+
+  {/*state to handle submission*/}
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors = {
@@ -208,25 +214,66 @@ if (!email.trim()) {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
     setTouched({
-      firstName: true,
-      lastName: true,
-      gender: true,
-      role: true,
-      department: true,
-      email: true,
-      dob: true,
-      licenseNumber: true,
-      password: true,
-      confirmPassword: true,
+      firstName: true, lastName: true, gender: true, role: true,
+      department: true, email: true, dob: true, licenseNumber: true,
+      password: true, confirmPassword: true,
     });
 
     if (validateForm()) {
-      toast.success("Registration successful");
-      // 4. Replace onSuccess with navigate
-      navigate('/healthcare/dashboard'); 
+      setIsSubmitting(true);
+
+      // --- ADD THE 'try' KEYWORD HERE ---
+      try { 
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              full_name: `${firstName} ${lastName}`, // Correctly combines names
+              role: role,                         // Correctly passes the role
+            },
+          },
+        });
+
+        if (authError) {
+          throw authError; // This will now be caught by the catch block
+        }
+
+        if (!authData.user) {
+          throw new Error("Supabase registration failed: User object not returned.");
+        }
+
+        const registrationData = {
+          id: authData.user.id,
+          first_name: firstName,
+          last_name: lastName,
+          gender,
+          role,
+          department,
+          email,
+          date_of_birth: dob,
+          medical_license_number: licenseNumber,
+        };
+       //add user to user table if auth suceeds
+        await axios.post('/api/register/clinician/', registrationData);
+      
+        
+        toast.success("Registration successful! You can now log in.");
+        navigate('/healthcare/login');
+
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.email?.[0] || error.message || "An unknown error occurred.";
+        
+        console.error("Registration failed:", errorMessage);
+        setServerError(errorMessage);
+        toast.error(`Registration failed: ${errorMessage}`);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -253,7 +300,7 @@ if (!email.trim()) {
           <div className="p-8 space-y-6">
             {/* Back Button */}
             <button
-              // 5. Replace onBack with navigate
+              
               onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
@@ -571,20 +618,35 @@ if (!email.trim()) {
                 )}
               </div>
 
+              {/* Server Error Display */}
+              {serverError && (
+                <div className="text-center p-2 rounded-md bg-destructive/10 text-destructive">
+                  {serverError}
+                </div>
+              )}
+
               {/* Submit Buttons */}
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                  Register
-                </Button>
+              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registering...
+                  </>
+                ) : (
+                  "Register"
+                )}
+              </Button>
                 <Button 
                   type="button" 
                   variant="outline" 
-                  className="flex-1" 
-                  // 6. Replace onBackToLogin with navigate
+                  className="flex-1"
                   onClick={() => navigate('/healthcare/login')}
+                  disabled={isSubmitting}
                 >
                   Back to Login
                 </Button>
+
               </div>
             </form>
           </div>

@@ -1,0 +1,34 @@
+# api/urls.py
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    # This is the line that was missing from Django's list
+    path('roles/', views.RoleSelectionAPIView.as_view(), name='role-selection'),
+
+    # --- User and Profile URLs ---
+    path('users/', views.UserListAPIView.as_view(), name='user-list'),
+    path('users/<uuid:pk>/', views.UserDetailAPIView.as_view(), name='user-detail'),
+
+    path('patients/', views.PatientListAPIView.as_view(), name='patient-list'),
+    path('patients/<uuid:pk>/', views.PatientDetailAPIView.as_view(), name='patient-detail'),
+
+    # ... and all your other URLs
+    path('clinicians/', views.ClinicianListAPIView.as_view(), name='clinician-list'),
+    path('clinicians/<uuid:pk>/', views.ClinicianDetailAPIView.as_view(), name='clinician-detail'),
+    path('cases/', views.DiagnosticCaseListCreateAPIView.as_view(), name='case-list-create'),
+    path('cases/<uuid:pk>/', views.DiagnosticCaseDetailAPIView.as_view(), name='case-detail'),
+    path('inputs/', views.DiagnosticInputListCreateAPIView.as_view(), name='input-list-create'),
+    path('inputs/<uuid:pk>/', views.DiagnosticInputDetailAPIView.as_view(), name='input-detail'),
+    path('diagnoses/', views.DiagnosisListCreateAPIView.as_view(), name='diagnosis-list-create'),
+    path('diagnoses/<uuid:pk>/', views.DiagnosisDetailAPIView.as_view(), name='diagnosis-detail'),
+    path('recommendations/', views.RecommendationListCreateAPIView.as_view(), name='recommendation-list-create'),
+    path('recommendations/<uuid:pk>/', views.RecommendationDetailAPIView.as_view(), name='recommendation-detail'),
+    path('models/', views.ModelListCreateAPIView.as_view(), name='model-list-create'),
+    path('models/<uuid:pk>/', views.ModelDetailAPIView.as_view(), name='model-detail'),
+    path('guidelines/', views.ClinicalGuidelineListCreateAPIView.as_view(), name='guideline-list-create'),
+    path('guidelines/<uuid:pk>/', views.ClinicalGuidelineDetailAPIView.as_view(), name='guideline-detail'),
+    path('register/clinician/', views.ClinicianRegistrationAPIView.as_view(), name='clinician-register'),
+    path('register/patient/', views.PatientRegistrationAPIView.as_view(), name='patient-register'),
+]

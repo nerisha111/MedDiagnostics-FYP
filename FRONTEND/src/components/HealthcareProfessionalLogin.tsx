@@ -1,53 +1,64 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ArrowLeft, Eye, EyeOff, Stethoscope } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Stethoscope, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
+import { supabase } from "../supabaseClient"; // Ensure this path is correct
 
 export function HealthcareProfessionalLogin() {
-  const navigate = useNavigate(); 
-  const [licenseNumber, setLicenseNumber] = useState("");
+  const navigate = useNavigate();
+  
+  // Cleaned up state - only what's needed for login
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({ licenseNumber: "", password: "" });
-  const [touched, setTouched] = useState({ licenseNumber: false, password: false });
+  
+  // State for submission status and server-side errors
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const validateForm = () => {
-    const newErrors = { licenseNumber: "", password: "" };
-    let isValid = true;
+  // Simple validation check, can be used to disable the submit button
+  const canSubmit = email.trim() !== "" && password.trim() !== "";
 
-    if (!licenseNumber.trim()) {
-      newErrors.licenseNumber = "Medical License Number is required.";
-      isValid = false;
-    }
-
-    if (!password) {
-      newErrors.password = "Password is required.";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  // The new handleSubmit function that calls Supabase
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ licenseNumber: true, password: true });
-    
-    if (validateForm()) {
-      toast.success("Login successful");
-   
-      navigate('/healthcare/dashboard'); 
-    }
-  };
+    setServerError(null); // Reset previous errors
 
-  const handleBlur = (field: "licenseNumber" | "password") => {
-    setTouched({ ...touched, [field]: true });
-    validateForm();
+    if (!canSubmit) {
+      toast.error("Please enter both your email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Send the login request directly to Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      // Supabase returns an error object if login fails
+      if (error) {
+        throw error;
+      }
+
+      // If successful, Supabase automatically handles the session (stores the JWT)
+      toast.success("Login successful!");
+      navigate('/healthcare/dashboard');
+
+    } catch (error: any) {
+      // Display the error message from Supabase
+      setServerError(error.message || "An unexpected error occurred.");
+      toast.error("Login failed. Please check your credentials.");
+    } finally {
+      // Re-enable the button whether login succeeded or failed
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -55,17 +66,14 @@ export function HealthcareProfessionalLogin() {
       <div className="w-full max-w-md">
         <Card className="shadow-2xl border-t-4 border-t-primary">
           <div className="p-8 space-y-6">
-            {/* Back Button */}
             <button
-              
-              onClick={() => navigate('/')} 
+              onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" />
               Back to role selection
             </button>
 
-            {/* Header */}
             <div className="text-center space-y-3">
               <div className="flex justify-center mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -74,35 +82,25 @@ export function HealthcareProfessionalLogin() {
               </div>
               <h1 className="text-3xl">Healthcare Professional Login</h1>
               <p className="text-muted-foreground">
-                Sign in to access the diagnostic system
+                Sign in with your email and password
               </p>
             </div>
 
-            {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Medical License Number */}
               <div className="space-y-2">
-                <Label htmlFor="licenseNumber">
-                  Medical License Number <span className="text-destructive">*</span>
+                <Label htmlFor="email">
+                  Email <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="licenseNumber"
-                  type="text"
-                  placeholder="Enter your license number"
-                  value={licenseNumber}
-                  onChange={(e) => {
-                    setLicenseNumber(e.target.value);
-                    if (touched.licenseNumber) validateForm();
-                  }}
-                  onBlur={() => handleBlur("licenseNumber")}
-                  className={touched.licenseNumber && errors.licenseNumber ? "border-[#E63946]" : ""}
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
                 />
-                {touched.licenseNumber && errors.licenseNumber && (
-                  <p className="text-sm text-[#E63946]">{errors.licenseNumber}</p>
-                )}
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password">
                   Password <span className="text-destructive">*</span>
@@ -113,33 +111,35 @@ export function HealthcareProfessionalLogin() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (touched.password) validateForm();
-                    }}
-                    onBlur={() => handleBlur("password")}
-                    className={`pr-10 ${touched.password && errors.password ? "border-[#E63946]" : ""}`}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {touched.password && errors.password && (
-                  <p className="text-sm text-[#E63946]">{errors.password}</p>
-                )}
               </div>
 
-              {/* Login Button */}
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                Login
+              {/* Display server-side errors */}
+              {serverError && (
+                <div className="text-sm text-center text-destructive p-2 bg-destructive/10 rounded-md">
+                  {serverError}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={!canSubmit || isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  "Login"
+                )}
               </Button>
             </form>
 
@@ -155,13 +155,12 @@ export function HealthcareProfessionalLogin() {
               </div>
             </div>
 
-            {/* Register Link */}
             <div className="text-center">
               <button
                 type="button"
-                
                 onClick={() => navigate('/healthcare/register')}
                 className="text-primary hover:underline"
+                disabled={isSubmitting}
               >
                 Register as Healthcare Professional
               </button>

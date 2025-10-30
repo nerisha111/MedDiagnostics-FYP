@@ -5,8 +5,10 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { ArrowLeft, Shield, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
+import { supabase } from "../supabaseClient";
 
 
 export function PatientSignUp() {
@@ -44,6 +46,9 @@ export function PatientSignUp() {
     confirmPassword: false,
     phone: false,
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors = {
@@ -181,24 +186,58 @@ if (!email.trim()) {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
     setTouched({
-      firstName: true,
-      lastName: true,
-      dob: true,
-      gender: true,
-      address: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-      phone: true,
+      firstName: true, lastName: true, dob: true, gender: true, address: true,
+      email: true, password: true, confirmPassword: true, phone: true,
     });
 
     if (validateForm()) {
-      toast.success("Registration successful");
-      // 4. Replace onSuccess with navigate
-      navigate('/patient/dashboard');
+      setIsSubmitting(true);
+      try {
+        // Step A: Create the user in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              full_name: `${firstName} ${lastName}`,
+              role: 'patient', // Send 'patient' role for the trigger
+            },
+          },
+        });
+
+        if (authError) { throw authError; }
+        if (!authData.user) { throw new Error("Supabase registration failed."); }
+
+        // Step B: Send data to your Django backend
+        const registrationData = {
+          id: authData.user.id, // Use 'id' as the key
+          first_name: firstName,
+          last_name: lastName,
+          gender,
+          date_of_birth: dob,
+          email,
+          phone_number: phone, // Field names should match backend model
+          address,
+        };
+        
+        // Use the new patient registration endpoint
+        await axios.post('/api/register/patient/', registrationData);
+        
+        // Step C: Handle success
+        toast.success("Registration successful! You can now log in.");
+        navigate('/patient/login');
+
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.[0] || error.message || "An unknown error occurred.";
+        setServerError(errorMessage);
+        toast.error(`Registration failed: ${errorMessage}`);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -517,16 +556,12 @@ if (!email.trim()) {
 
               {/* Submit Buttons */}
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                  Register
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Registering...</>
+                  ) : ( "Register" )}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="flex-1" 
-                  // 8. Replace onBackToLogin with navigate
-                  onClick={() => navigate('/patient/login')}
-                >
+                <Button type="button" variant="outline" className="flex-1" onClick={() => navigate('/patient/login')} disabled={isSubmitting}>
                   Back to Login
                 </Button>
               </div>

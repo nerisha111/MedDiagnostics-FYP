@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 
 // Import Layout
 import { HealthcareLayout } from "./components/HealthcareLayout";
+
+
 
 // Import ALL Page Components
 import { RoleSelection } from "./components/RoleSelection";
@@ -30,9 +32,32 @@ import { PatientDataUpload } from "./components/PatientDataUpload";
 import { PatientAnalysisResults } from "./components/PatientAnalysisResults";
 import { PatientSignIn } from "./components/PatientSignIn";
 import { PatientSignUp } from "./components/PatientSignUp";
+import { NotFoundPage } from "./components/NotFoundPage";
+
+
+type Note = {
+  id: number;
+  title: string;
+  content: string;
+};
 
 export default function App() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+   const [notes, setNotes] = useState<Note[]>([]);
+
+
+  // Fetch notes from Django backend
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/notes/") // full URL to backend
+      .then((res) => res.json())
+      .then((data) => setNotes(data))
+      .catch((err) => console.error("Error fetching notes:", err));
+  }, []);
+
+function handleNoteAdded(newNote: Note) {
+  setNotes((prev) => [newNote, ...prev]);
+}
+
 
   return (
     <>
@@ -77,11 +102,21 @@ export default function App() {
             <Route path="settings" element={<PatientAccountSettings />} />
             <Route path="help" element={<PatientHelpSupport />} />
           </Route>
+
+            
+
+          {/*catch-all route for 404 Not Found */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Router>
 
       <FeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
       <Toaster />
-    </>
+
   );
-}
+   
+
+
+  
+</>
+  )}
