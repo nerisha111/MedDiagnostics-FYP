@@ -47,12 +47,14 @@ export default function App() {
 
 
   // Fetch notes from Django backend
+/*
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/notes/") // full URL to backend
+    fetch("http://127.0.0.1:8000/api/notes/") 
       .then((res) => res.json())
       .then((data) => setNotes(data))
       .catch((err) => console.error("Error fetching notes:", err));
   }, []);
+    */
 
 function handleNoteAdded(newNote: Note) {
   setNotes((prev) => [newNote, ...prev]);

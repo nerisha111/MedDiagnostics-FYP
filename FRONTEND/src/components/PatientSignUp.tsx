@@ -214,7 +214,7 @@ if (!email.trim()) {
 
         // Step B: Send data to your Django backend
         const registrationData = {
-          id: authData.user.id, // Use 'id' as the key
+          id: authData.user.id, 
           first_name: firstName,
           last_name: lastName,
           gender,

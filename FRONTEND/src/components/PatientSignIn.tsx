@@ -1,21 +1,28 @@
+
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // 1. Import useNavigate
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient"; // <-- 1. Import Supabase client
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Eye, EyeOff, Shield, ArrowLeft } from "lucide-react";
+import { toast } from "sonner"; // <-- 2. Import toast for notifications
+import { Eye, EyeOff, Shield, ArrowLeft, Loader2 } from "lucide-react";
 
-// 2. Removed the props interface
 export function PatientSignIn() {
-  const navigate = useNavigate(); // 3. Initialize the navigate function
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [touched, setTouched] = useState({ email: false, password: false });
 
+  // --- 3. Add state for loading and server errors ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
   const validateForm = () => {
+    // (This validation function is good, no changes needed here)
     const newErrors = { email: "", password: "" };
     let isValid = true;
 
@@ -36,15 +43,42 @@ export function PatientSignIn() {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // --- 4. Rewrite the handleSubmit function completely ---
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null); // Clear previous errors
     setTouched({ email: true, password: true });
-    
+
     if (validateForm()) {
-      // 4. Replace onSuccess with navigate
-      navigate('/patient/dashboard');
+      setIsSubmitting(true);
+      try {
+        // This is the crucial step: Call Supabase to sign in
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+
+        // If Supabase returns an error (e.g., "Invalid login credentials"), throw it
+        if (error) {
+          throw error;
+        }
+
+        // If successful, show a success message and navigate to the dashboard
+        toast.success("Login successful! Welcome back.");
+        navigate('/patient/dashboard');
+
+      } catch (error: any) {
+        // Catch any errors and display them to the user
+        const errorMessage = error.message || "An unknown error occurred.";
+        setServerError(errorMessage);
+        toast.error(`Login failed: ${errorMessage}`);
+      } finally {
+        // Ensure the loading state is turned off, whether it succeeded or failed
+        setIsSubmitting(false);
+      }
     }
   };
+
 
   const handleBlur = (field: "email" | "password") => {
     setTouched({ ...touched, [field]: true });
@@ -56,9 +90,7 @@ export function PatientSignIn() {
       <div className="w-full max-w-md">
         <Card className="shadow-2xl border-t-4 border-t-primary">
           <div className="p-8 space-y-6">
-            {/* Back Button */}
             <button
-              // 5. Replace onBack with navigate
               onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
@@ -66,7 +98,6 @@ export function PatientSignIn() {
               Back to role selection
             </button>
 
-            {/* Header */}
             <div className="text-center space-y-3">
               <div className="flex justify-center mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -79,22 +110,15 @@ export function PatientSignIn() {
               </p>
             </div>
 
-            {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-destructive">*</span>
-                </Label>
+                <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="your.email@example.com"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (touched.email) validateForm();
-                  }}
+                  onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => handleBlur("email")}
                   className={touched.email && errors.email ? "border-[#E63946]" : ""}
                 />
@@ -103,18 +127,10 @@ export function PatientSignIn() {
                 )}
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">
-                    Password <span className="text-destructive">*</span>
-                  </Label>
-                  {/* 6. Added Forgot Password link */}
-                  <button
-                    type="button"
-                    onClick={() => navigate('/recover-password')}
-                    className="text-xs text-primary hover:underline"
-                  >
+                  <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
+                  <button type="button" onClick={() => navigate('/recover-password')} className="text-xs text-primary hover:underline">
                     Forgot Password?
                   </button>
                 </div>
@@ -124,19 +140,11 @@ export function PatientSignIn() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (touched.password) validateForm();
-                    }}
+                    onChange={(e) => setPassword(e.target.value)}
                     onBlur={() => handleBlur("password")}
                     className={`pr-10 ${touched.password && errors.password ? "border-[#E63946]" : ""}`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {/* 7. Uncommented icons */}
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -145,13 +153,19 @@ export function PatientSignIn() {
                 )}
               </div>
 
-              {/* Login Button */}
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                Login
+              {/* --- 5. Display server error message to the user --- */}
+              {serverError && (
+                <p className="text-sm text-center text-[#E63946] bg-red-50 p-3 rounded-md">{serverError}</p>
+              )}
+
+              {/* --- 6. Update Button to show loading state --- */}
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</>
+                ) : ( "Login" )}
               </Button>
             </form>
 
-            {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -163,14 +177,8 @@ export function PatientSignIn() {
               </div>
             </div>
 
-            {/* Register Link */}
             <div className="text-center">
-              <button
-                type="button"
-                // 8. Replace onSignUp with navigate
-                onClick={() => navigate('/patient/register')}
-                className="text-primary hover:underline"
-              >
+              <button type="button" onClick={() => navigate('/patient/register')} className="text-primary hover:underline">
                 Register as Patient
               </button>
             </div>

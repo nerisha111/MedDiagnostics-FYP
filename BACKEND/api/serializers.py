@@ -14,6 +14,47 @@ from .models import (
 )
 
 # ==============================================================================
+# PROFILE SERIALIZERS (No changes needed here)
+# ==============================================================================
+
+class PatientProfileSerializer(serializers.ModelSerializer):
+    """A simple serializer for nested patient data."""
+    class Meta:
+        model = Patient
+        fields = ['phone_number', 'address']
+
+class ClinicianProfileSerializer(serializers.ModelSerializer):
+    """A simple serializer for nested clinician data."""
+    class Meta:
+        model = Clinician
+        fields = ['role', 'department', 'medical_license_number']
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    A smart serializer that returns the full user profile, including
+    role-specific details (patient or clinician).
+    """
+    patient_profile = PatientProfileSerializer(source='patient', read_only=True)
+    clinician_profile = ClinicianProfileSerializer(source='clinician', read_only=True)
+    user_role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'created_at', 'first_name', 'last_name',
+            'gender', 'date_of_birth', 'email', 'user_role',
+            'patient_profile', 'clinician_.profile'
+        ]
+
+    def get_user_role(self, obj):
+        """Checks if a related patient or clinician object exists."""
+        if hasattr(obj, 'patient'):
+            return 'patient'
+        if hasattr(obj, 'clinician'):
+            return 'clinician'
+        return None
+
+# ==============================================================================
 # BASE SERIALIZERS (No changes needed here)
 # ==============================================================================
 
@@ -63,16 +104,9 @@ class DiagnosticCaseSerializer(serializers.ModelSerializer):
 class DiagnosticInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = Diagnosticinput
-        # List all fields that the frontend will send
         fields = [
-            'id',
-            'diagnostic_case',
-            'input_type',
-            'description',
-            'file_url',
-            'file_name',
-            'file_size',
-            'upload_date'
+            'id', 'diagnostic_case', 'input_type', 'description',
+            'file_url', 'file_name', 'file_size', 'upload_date'
         ]
         read_only_fields = ['id', 'upload_date']
 
@@ -96,39 +130,20 @@ class RecommendationSerializer(serializers.ModelSerializer):
         ]
 
 # ==============================================================================
-# REGISTRATION SERIALIZERS (Corrected and Organized)
+# REGISTRATION SERIALIZERS (Patient serializer is now fixed)
 # ==============================================================================
 
-# --- Clinician Registration ---
-
 class ClinicianNestedDataSerializer(serializers.ModelSerializer):
-    """
-    A simple nested serializer to handle the fields for the Clinician model.
-    """
     class Meta:
         model = Clinician
         fields = ['role', 'department', 'medical_license_number']
 
 class ClinicianRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for clinician registration with Supabase.
-    Creates a User and a related Clinician instance from a single API call.
-    """
     clinician_data = ClinicianNestedDataSerializer(write_only=True)
     id = serializers.UUIDField()
-
     class Meta:
         model = User
-        fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'gender',
-            'date_of_birth',
-            'email',
-            'clinician_data',
-        ]
-
+        fields = ['id', 'first_name', 'last_name', 'gender', 'date_of_birth', 'email', 'clinician_data']
     def create(self, validated_data):
         clinician_info = validated_data.pop('clinician_data')
         user_id = validated_data.pop('id')
@@ -136,39 +151,35 @@ class ClinicianRegistrationSerializer(serializers.ModelSerializer):
         Clinician.objects.create(id=user, **clinician_info)
         return user
 
-# --- Patient Registration ---
-
 class PatientNestedDataSerializer(serializers.ModelSerializer):
-    """
-    A simple nested serializer to handle the fields for the Patient model.
-    """
     class Meta:
         model = Patient
         fields = ['phone_number', 'address']
 
 class PatientRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for patient registration with Supabase.
-    Creates a User and a related Patient instance from a single API call.
-    """
     patient_data = PatientNestedDataSerializer(write_only=True)
-    id = serializers.UUIDField()
+    id = serializers.UUIDField(write_only=True) # Changed to write_only for clarity
 
     class Meta:
         model = User
         fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'gender',
-            'date_of_birth',
-            'email',
-            'patient_data',
+            'id', 'first_name', 'last_name', 'gender',
+            'date_of_birth', 'email', 'patient_data'
         ]
-
+    
+    # --- THIS create METHOD IS NOW FIXED FOR PATIENTS ---
     def create(self, validated_data):
         patient_info = validated_data.pop('patient_data')
         user_id = validated_data.pop('id')
-        user = User.objects.create(id=user_id, **validated_data)
+
+        # This is the crucial fix: we now explicitly save the incoming ID
+        # to BOTH the 'id' (primary key) and the 'supabase_user_id' fields.
+        user = User.objects.create(
+            id=user_id,
+            supabase_user_id=user_id,
+            **validated_data
+        )
+        
         Patient.objects.create(id=user, **patient_info)
         return user
+    # --- END OF FIX ---

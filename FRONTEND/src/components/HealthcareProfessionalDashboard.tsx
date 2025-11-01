@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { supabase } from "../supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Table,
@@ -32,10 +33,12 @@ import {
 } from "lucide-react";
 import { Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
 
+
 export function HealthcareProfessionalDashboard() {
   const navigate = useNavigate();
+  
 
-  // Mock data (remains unchanged)
+  
   const metrics = [
     {
       title: "Total Cases Analyzed",

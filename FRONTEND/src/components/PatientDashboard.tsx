@@ -1,8 +1,15 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { supabase } from "../supabaseClient"; // Ensure this path is correct
+
+// UI Components
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-// 1. Import your custom hook (make sure the path is correct)
+
+// Custom Hooks
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+
+// Icons
 import {
   Upload,
   FileCheck,
@@ -14,21 +21,23 @@ import {
   LayoutDashboard,
   Bell,
   CheckCircle2,
+  Loader2, 
 } from "lucide-react";
 
+// --- TypeScript Interface ---
+interface User {
+  first_name: string;
+  last_name: string;
+}
 
 // --- Child Page Components ---
-// These are the components that will be rendered inside the Outlet.
-// Note that they no longer need their own titles or outer layout wrappers.
 
 export function DashboardHome() {
   const navigate = useNavigate();
   return (
-    // The main header is now handled by the layout, so we just have the content.
     <div className="space-y-6">
       <p className="text-muted-foreground">Here’s a summary of your recent activity and health status.</p>
       <main className="space-y-6">
-        {/* Primary Call-to-Action Card */}
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center gap-4 space-y-0">
             <div className="p-3 rounded-lg bg-primary/10"><Upload className="w-6 h-6 text-primary" /></div>
@@ -43,7 +52,6 @@ export function DashboardHome() {
           </CardContent>
         </Card>
         
-        {/* Grid layout for secondary widgets */}
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="w-5 h-5" /><span>Recent Activity</span></CardTitle></CardHeader>
@@ -53,6 +61,7 @@ export function DashboardHome() {
             </CardContent>
           </Card>
           <Card>
+            {/* --- FIX 1: Corrected the closing tag from </Header> to </CardHeader> --- */}
             <CardHeader><CardTitle className="flex items-center gap-2"><ArrowRight className="w-5 h-5" /><span>Quick Access</span></CardTitle></CardHeader>
             <CardContent className="flex flex-col space-y-3">
               <Button variant="outline" className="justify-start" onClick={() => navigate('/patient/reports')}><FileCheck className="w-4 h-4 mr-2" /> View All My Reports</Button>
@@ -72,15 +81,47 @@ export const PatientHistory = () => <div className="space-y-6"><p className="tex
 export const AccountSettings = () => <div className="space-y-6"><p className="text-muted-foreground">Your account settings will be here.</p></div>;
 export const Help = () => <div className="space-y-6"><p className="text-muted-foreground">The Help & Support page will be here.</p></div>;
 
-
 /**
  * Main Patient Dashboard Layout Component
  */
 export function PatientDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 2. Enriched menuItems with a 'description' for the on-page header
+  useEffect(() => {
+    const checkSessionAndFetchUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate('/patient/login');
+          return;
+        }
+        const { user: authUser } = session;
+        const { data, error } = await supabase
+          .from('User')
+          .select('first_name, last_name')
+          .eq('supabase_user_id', authUser.id)
+          .single();
+        if (error) throw error;
+        if (data) {
+          setUser(data);
+        } else {
+          console.warn("User is authenticated but no profile was found in the 'User' table.");
+          await supabase.auth.signOut();
+          navigate('/patient/login');
+        }
+      } catch (error) {
+        console.error("Error checking session or fetching user data:", error);
+        navigate('/patient/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkSessionAndFetchUser();
+  }, [navigate]);
+
   const menuItems = [
     { id: "dashboard", icon: LayoutDashboard, label: "Dashboard", path: "/patient/dashboard", description: "View your health summary and recent activity." },
     { id: "upload", icon: Upload, label: "Upload Data", path: "/patient/upload", description: "Securely upload your medical data for analysis." },
@@ -92,16 +133,32 @@ export function PatientDashboard() {
   
   const activeMenuItem = menuItems.find(item => location.pathname === item.path);
 
-  // 3. THIS IS THE FIX: Call the custom hook to update the browser tab title
   useDocumentTitle(
     activeMenuItem
       ? `${activeMenuItem.label} - MedDiagnostic Pro`
       : 'Patient Portal - MedDiagnostic Pro'
   );
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+  
+  const getInitials = (user: User | null): string => {
+    if (!user || !user.first_name || !user.last_name) return '';
+    return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar Navigation */}
       <aside className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
         <div className="p-6 border-b border-border">
           <h2 className="text-xl font-bold">MedDiagnostic Pro</h2>
@@ -109,9 +166,11 @@ export function PatientDashboard() {
         </div>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center"><span className="text-primary font-bold">JD</span></div>
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-primary font-bold">{getInitials(user)}</span>
+            </div>
             <div>
-              <p className="font-semibold">John Doe</p>
+              <p className="font-semibold">{`${user.first_name} ${user.last_name}`}</p>
               <p className="text-xs text-muted-foreground">Last login: Today</p>
             </div>
           </div>
@@ -133,16 +192,13 @@ export function PatientDashboard() {
           </ul>
         </nav>
         <div className="p-4 border-t border-border">
-          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium">
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium">
             <LogOut className="w-5 h-5" />
             <span>Sign Out</span>
           </button>
         </div>
       </aside>
-
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto bg-slate-50">
-        {/* 4. Restructured main content area with dynamic header */}
         <div className="max-w-7xl mx-auto p-8 space-y-6">
           {activeMenuItem && (
             <header>
