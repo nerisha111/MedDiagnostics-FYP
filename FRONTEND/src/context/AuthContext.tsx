@@ -1,11 +1,9 @@
-
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../supabaseClient';
 import axios from 'axios';
 import { Session } from '@supabase/supabase-js';
 
-
+// --- INTERFACES (No changes needed here) ---
 interface PatientProfile {
   phone_number: string;
   address: string;
@@ -16,7 +14,6 @@ interface ClinicianProfile {
   department: string;
   medical_license_number: string;
 }
-
 
 interface UserProfile {
   id: string;
@@ -34,8 +31,8 @@ interface AuthContextType {
   session: Session | null;
   profile: UserProfile | null; 
   isLoading: boolean;
+  refreshProfile: () => void;
 }
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -45,31 +42,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-   
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      
-      fetchProfile(session);
-    });
-
- 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        fetchProfile(session);
-      }
-    );
-
-    
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  
   const fetchProfile = async (currentSession: Session | null) => {
-    setIsLoading(true);
+   
+    if (currentSession) {
+      setIsLoading(true);
+    }
+    
     if (!currentSession) {
       setProfile(null);
       setIsLoading(false);
@@ -77,36 +55,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      
       const token = currentSession.access_token;
-
       const response = await axios.get('http://127.0.0.1:8000/api/profile/me/', {
-       headers: {
-        Authorization: `Bearer ${token}`
-    },
-});
-
-
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+      });
       setProfile(response.data);
-
     } catch (error) {
       console.error('Error fetching user profile:', error);
+    
       setProfile(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const value = {
+
+  useEffect(() => {
+   
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      fetchProfile(session);
+    });
+
+   
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        fetchProfile(session);
+      }
+    );
+
+  
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []); 
+
+ 
+  const refreshProfile = () => {
+    if (session) {
+      fetchProfile(session);
+    }
+  };
+
+
+  const value: AuthContextType = {
     session,
     profile,
     isLoading,
+    refreshProfile, 
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Create a custom hook for easy access to the context
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
