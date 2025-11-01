@@ -43,7 +43,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'created_at', 'first_name', 'last_name',
             'gender', 'date_of_birth', 'email', 'user_role',
-            'patient_profile', 'clinician_.profile'
+            'patient_profile', 'clinician_profile'
         ]
 
     def get_user_role(self, obj):
@@ -182,4 +182,3 @@ class PatientRegistrationSerializer(serializers.ModelSerializer):
         
         Patient.objects.create(id=user, **patient_info)
         return user
-    # --- END OF FIX ---
