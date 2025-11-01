@@ -1,2 +1,2 @@
 
-  # Medical Login Interface Design
+  # MedDiagnostic
