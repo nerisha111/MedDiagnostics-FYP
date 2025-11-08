@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
@@ -15,69 +15,115 @@ import {
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
 import { CheckCircle2, Loader2, Clock, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
+import { supabase } from "../supabaseClient";
+
+// Type definition for the data we expect from the polling endpoint
+interface CaseData {
+  id: string;
+  status: 'PROCESSING' | 'COMPLETE' | 'FAILED';
+  diagnosis_set: { diagnosis_json: any }[]; // This holds our final result
+}
 
 export function AnalysisLoading() {
   const navigate = useNavigate();
-
-  const location = useLocation(); 
+  const location = useLocation();
+  const { caseId } = useParams<{ caseId: string }>(); // Get the caseId from the URL
 
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [showLogs, setShowLogs] = useState(false);
+  const [showLogs, setShowLogs] = useState(false); // Kept for your UI
 
+  // Determine paths dynamically, just like your original code
   const isPatientFlow = location.pathname.startsWith('/patient');
   const resultsPath = isPatientFlow ? '/patient/results' : '/healthcare/results';
-  const dashboardPath = isPatientFlow ? '/patient/dashboard' : '/healthcare/dashboard';
+  const uploadPath = isPatientFlow ? '/patient/upload' : '/healthcare/upload';
 
+  // Your original UI steps for visual feedback
   const steps = [
-    { id: 1, title: "Data Validation", substeps: ["File integrity check", "Format verification"] },
-    { id: 2, title: "Preprocessing Data", substeps: ["Normalizing formats", "Image enhancement", "Text extraction"] },
-    { id: 3, title: "Integrating Multimodal Profile", substeps: ["Combining data sources", "Feature extraction"] },
-    { id: 4, title: "Analyzing Patterns", substeps: ["Neural network analysis", "Pattern recognition"] },
-    { id: 5, title: "Generating Report", substeps: ["Diagnosis generation", "Confidence calculation", "Finalizing report"] },
+    { id: 1, title: "Data Validation & Preprocessing", substeps: ["File integrity check", "Format verification", "Text extraction"] },
+    { id: 2, title: "Integrating Multimodal Profile", substeps: ["Combining data sources", "Feature extraction"] },
+    { id: 3, title: "AI Analyzing Patterns (Map Phase)", substeps: ["Chunking documents", "Generating initial summaries"] },
+    { id: 4, title: "Synthesizing Summaries (Reduce Phase)", substeps: ["Combining insights", "Cross-referencing findings"] },
+    { id: 5, title: "Generating Final Report", substeps: ["Structuring JSON output", "Final confidence calculation"] },
   ];
 
+  // Your original logs, can be kept for visual effect
   const logs = [
-    "[10:23:45] Initializing analysis pipeline...",
-    "[10:23:46] Loading user data from secure session...",
-    "[10:23:47] Processing 4 DICOM files...",
-    "[10:23:48] Extracting clinical notes...",
-    "[10:23:50] Running quality checks...",
-    "[10:23:51] Data validation complete.",
-    "[10:23:52] Starting preprocessing...",
-    "[10:23:54] Enhancing image contrast...",
+    "[INFO] Initializing analysis pipeline...",
+    "[INFO] Secure session established.",
+    "[INFO] Beginning file download from cloud storage...",
+    "[SUCCESS] PDF content extracted successfully.",
+    "[INFO] Data validation complete. Starting preprocessing...",
   ];
-
+  
+  // --- NEW useEffect hook with REAL backend polling ---
   useEffect(() => {
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          // 4. Use the dynamic resultsPath for navigation
-          setTimeout(() => navigate(resultsPath, { replace: true }), 1000);
-          return 100;
+    let isMounted = true; // Prevents state updates if the component unmounts
+
+    // 1. REAL POLLING LOGIC
+    const pollStatus = async () => {
+      if (!isMounted || !caseId) return;
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("User not authenticated.");
+
+        const response = await axios.get<CaseData>(`http://127.0.0.1:8000/api/cases/${caseId}/`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const caseData = response.data;
+
+        if (caseData.status === 'COMPLETE') {
+          setProgress(100); // Set progress to 100% on completion
+          setCurrentStep(steps.length - 1);
+          toast.success("Analysis complete!");
+          const diagnosisResult = caseData.diagnosis_set[0]?.diagnosis_json;
+          // Navigate to the results page with the structured JSON data
+          setTimeout(() => navigate(resultsPath, { state: { result: diagnosisResult }, replace: true }), 1000);
+          return; // Stop the polling loop
         }
-        return prev + 1;
-      });
-    }, 120); // Slightly increased duration for realism
+        
+        if (caseData.status === 'FAILED') {
+          toast.error("Analysis failed. Please check the case and try again.");
+          navigate(uploadPath, { replace: true });
+          return; // Stop the polling loop
+        }
+        
+        // If status is still 'PROCESSING', schedule the next poll
+        setTimeout(pollStatus, 5000); // Poll every 5 seconds
+
+      } catch (error) {
+        toast.error("A connection error occurred while checking analysis status.");
+        console.error("Polling error:", error);
+        // Optional: you could navigate away after several failed attempts
+      }
+    };
+
+    // 2. FAKE PROGRESS UI LOGIC (for a better user experience)
+    // This runs in parallel to the real polling to make the UI feel responsive.
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => (prev >= 99 ? 99 : prev + 1)); // It will never reach 100 on its own
+    }, 800); // A slightly slower, more believable progress speed
 
     const stepInterval = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev >= steps.length - 1) {
-          clearInterval(stepInterval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 2500); // Increased duration for realism
+      setCurrentStep((prev) => (prev >= steps.length - 1 ? prev : prev + 1));
+    }, 15000); // Advance a major visual step every 15 seconds
 
+    // 3. Start the process
+    toast.info("Analysis started. This may take several minutes.");
+    setTimeout(pollStatus, 3000); // Start polling after a 3-second delay
+
+    // Cleanup function to stop timers and polling when the user navigates away
     return () => {
+      isMounted = false;
       clearInterval(progressInterval);
       clearInterval(stepInterval);
     };
-  }, [navigate, resultsPath]); // Added resultsPath to dependency array
+  }, [caseId, navigate, resultsPath, uploadPath]); // Add all dependencies
 
-  const estimatedTime = Math.max(0, Math.ceil((100 - progress) * 0.15));
+  const estimatedTime = Math.max(0, Math.ceil((100 - progress) * 0.8));
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -91,12 +137,12 @@ export function AnalysisLoading() {
               </div>
               <h2 className="text-2xl font-semibold mb-2">Analyzing Medical Data</h2>
               <p className="text-muted-foreground text-center max-w-md">Our AI is processing your medical data to generate comprehensive diagnostic insights. Please do not close this window.</p>
-              <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>Estimated time remaining: {estimatedTime > 0 ? `${estimatedTime} seconds` : "Finalizing..."}</span></div>
+              <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>Estimated time remaining: {progress < 99 ? `${estimatedTime} seconds` : "Finalizing..."}</span></div>
             </div>
             <div className="space-y-3">
               {steps.map((step, idx) => {
                 const isActive = idx === currentStep;
-                const isComplete = idx < currentStep;
+                const isComplete = idx < currentStep || progress === 100;
                 return (
                   <div key={step.id} className={`flex items-start gap-4 p-4 rounded-lg transition-colors ${isActive ? "bg-primary/5 border border-primary/50" : "bg-muted/50"}`}>
                     <div className="flex-shrink-0 mt-1">
@@ -115,11 +161,10 @@ export function AnalysisLoading() {
               <AlertDialog>
                 <AlertDialogTrigger asChild><Button variant="outline">Cancel Analysis</Button></AlertDialogTrigger>
                 <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Canceling this analysis will discard all progress. You will be returned to your dashboard.</AlertDialogDescription></AlertDialogHeader>
+                  <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Canceling this analysis will discard all progress. You will be returned to the upload page.</AlertDialogDescription></AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Continue Analysis</AlertDialogCancel>
-                    {/* 5. Use the dynamic dashboardPath for the cancel action */}
-                    <AlertDialogAction onClick={() => navigate(dashboardPath)} className="bg-destructive hover:bg-destructive/90">
+                    <AlertDialogAction onClick={() => navigate(uploadPath)} className="bg-destructive hover:bg-destructive/90">
                       Yes, Cancel
                     </AlertDialogAction>
                   </AlertDialogFooter>

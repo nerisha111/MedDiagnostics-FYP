@@ -14,8 +14,8 @@ from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer, ModelSerializer,
     ClinicalGuidelineSerializer, DiagnosticCaseSerializer, DiagnosticInputSerializer,
     DiagnosisSerializer, RecommendationSerializer,
-    ClinicianRegistrationSerializer, PatientRegistrationSerializer,
-    UserProfileSerializer # <-- Import the new serializer
+    ClinicianRegistrationSerializer,
+    PatientRegistrationSerializer
 )
 from .permissions import IsOwner
 
@@ -24,6 +24,9 @@ from .permissions import IsOwner
 # ==============================================================================
 
 class RoleSelectionAPIView(APIView):
+    """
+    A public API view to provide role information for the frontend.
+    """
     permission_classes = [AllowAny]
     def get(self, request, format=None):
         roles = [
@@ -42,113 +45,122 @@ class RoleSelectionAPIView(APIView):
         ]
         return Response(roles)
 
-# --- ADD THIS NEW VIEW FOR THE GENERIC PROFILE ENDPOINT ---
-class UserProfileView(APIView):
-    """
-    Provides the profile data for the currently authenticated user.
-    This is the secure, role-agnostic endpoint the frontend should use after login.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        # request.user is populated by our custom SupabaseAuthentication class.
-        # The UserProfileSerializer will handle determining the role.
-        serializer = UserProfileSerializer(request.user)
-        return Response(serializer.data)
-
 # ==============================================================================
-# Model-Based API Views (No changes from your original code)
+# Model-Based API Views
 # ==============================================================================
-
-# ... (all your other views remain exactly the same) ...
 
 # --- User Profiles ---
 class UserListAPIView(generics.ListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
 class UserDetailAPIView(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsOwner]
+
 # --- Patient Profiles ---
 class PatientListAPIView(generics.ListAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
+
 class PatientDetailAPIView(generics.RetrieveAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsOwner]
+
 # --- Clinician Profiles ---
 class ClinicianListAPIView(generics.ListAPIView):
     queryset = Clinician.objects.all()
     serializer_class = ClinicianSerializer
+
 class ClinicianDetailAPIView(generics.RetrieveAPIView):
     queryset = Clinician.objects.all()
     serializer_class = ClinicianSerializer
     permission_classes = [IsOwner]
+
 # --- Diagnostic Cases ---
 class DiagnosticCaseListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = DiagnosticCaseSerializer
     permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         return Diagnosticcase.objects.filter(created_by=self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
 class DiagnosticCaseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Diagnosticcase.objects.all()
     serializer_class = DiagnosticCaseSerializer
+    # In production, add IsOwner permission here too.
+
 # --- Diagnostic Inputs ---
 class DiagnosticInputListCreateAPIView(generics.ListCreateAPIView):
     queryset = Diagnosticinput.objects.all()
     serializer_class = DiagnosticInputSerializer
+
 class DiagnosticInputBulkCreateAPIView(generics.CreateAPIView):
     queryset = Diagnosticinput.objects.all()
     serializer_class = DiagnosticInputSerializer
     permission_classes = [IsAuthenticated]
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, many=True)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 class DiagnosticInputDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Diagnosticinput.objects.all()
     serializer_class = DiagnosticInputSerializer
+
 # --- Diagnoses ---
 class DiagnosisListCreateAPIView(generics.ListCreateAPIView):
     queryset = Diagnosis.objects.all()
     serializer_class = DiagnosisSerializer
+
 class DiagnosisDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Diagnosis.objects.all()
     serializer_class = DiagnosisSerializer
+
 # --- Recommendations ---
 class RecommendationListCreateAPIView(generics.ListCreateAPIView):
     queryset = Recommendation.objects.all()
     serializer_class = RecommendationSerializer
+
 class RecommendationDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Recommendation.objects.all()
     serializer_class = RecommendationSerializer
+
 # --- AI/ML Models ---
 class ModelListCreateAPIView(generics.ListCreateAPIView):
     queryset = Model.objects.all()
     serializer_class = ModelSerializer
+
 class ModelDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Model.objects.all()
     serializer_class = ModelSerializer
+
 # --- Clinical Guidelines ---
 class ClinicalGuidelineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Clinicalguideline.objects.all()
     serializer_class = ClinicalGuidelineSerializer
+
 class ClinicalGuidelineDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clinicalguideline.objects.all()
     serializer_class = ClinicalGuidelineSerializer
+
 # ==============================================================================
-# REGISTRATION VIEWS (No changes from your original code)
+# REGISTRATION VIEWS
 # ==============================================================================
+
 class ClinicianRegistrationAPIView(generics.CreateAPIView):
     queryset = Clinician.objects.all()
     serializer_class = ClinicianRegistrationSerializer
     permission_classes = [AllowAny]
+
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         data['clinician_data'] = {
@@ -159,11 +171,17 @@ class ClinicianRegistrationAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        return Response({"message": "Clinician registered successfully."}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"message": "Clinician registered successfully."},
+            status=status.HTTP_201_CREATED
+        )
+
+
 class PatientRegistrationAPIView(generics.CreateAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientRegistrationSerializer
     permission_classes = [AllowAny]
+
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         data['patient_data'] = {
@@ -173,4 +191,7 @@ class PatientRegistrationAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        return Response({"message": "Patient registered successfully."}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"message": "Patient registered successfully."},
+            status=status.HTTP_201_CREATED
+        )

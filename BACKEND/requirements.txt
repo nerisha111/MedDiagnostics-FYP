@@ -1,0 +1,20 @@
+# Django and Web Server
+Django
+channels          
+python-dotenv
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+requests            
+
+# Database Driver
+psycopg2-binary
+
+# RAG and Supabase Client
+langchain
+langchain-community
+supabase
+sentence-transformers
+
+# Utilities
+Pillow

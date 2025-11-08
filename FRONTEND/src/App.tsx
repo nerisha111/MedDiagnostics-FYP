@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
-import { ProtectedRoute } from "./ProtectedRoute"; 
 
 // Import Layout
 import { HealthcareLayout } from "./components/HealthcareLayout";
+
+
 
 // Import ALL Page Components
 import { RoleSelection } from "./components/RoleSelection";
@@ -27,7 +28,7 @@ import { PatientMyReports } from "./components/PatientMyReports";
 import { PatientHistory } from "./components/PatientHistory";
 import { PatientAccountSettings } from "./components/PatientAccountSettings";
 import { PatientHelpSupport } from "./components/PatientHelpSupport";
-import { PatientDataUpload as PatientUploadPage } from "./components/PatientDataUpload"; // Renamed to avoid conflict
+import { PatientDataUpload } from "./components/PatientDataUpload";
 import { PatientAnalysisResults } from "./components/PatientAnalysisResults";
 import { PatientSignIn } from "./components/PatientSignIn";
 import { PatientSignUp } from "./components/PatientSignUp";
@@ -42,64 +43,80 @@ type Note = {
 
 export default function App() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [notes, setNotes] = useState<Note[]>([]);
+   const [notes, setNotes] = useState<Note[]>([]);
 
 
-  function handleNoteAdded(newNote: Note) {
-    setNotes((prev) => [newNote, ...prev]);
-  }
+  // Fetch notes from Django backend
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/notes/") // full URL to backend
+      .then((res) => res.json())
+      .then((data) => setNotes(data))
+      .catch((err) => console.error("Error fetching notes:", err));
+  }, []);
+
+function handleNoteAdded(newNote: Note) {
+  setNotes((prev) => [newNote, ...prev]);
+}
+
 
   return (
     <>
-      <Routes>
-       
-        <Route path="/" element={<RoleSelection />} />
-        <Route path="/loading" element={<AnalysisLoading />} />
-        <Route path="/recover-password" element={<PasswordRecovery />} />
-       
-        <Route path="/healthcare/login" element={<HealthcareProfessionalLogin />} />
-        <Route path="/healthcare/register" element={<HealthcareProfessionalRegistration />} />
-        <Route path="/healthcare/verify" element={<HealthcareProfessionalVerification />} />
-        
-        
-        <Route element={<HealthcareLayout />}>
-          <Route path="/healthcare/dashboard" element={<HealthcareProfessionalDashboard />} />
-          <Route path="/healthcare/upload" element={<HealthcareDataUpload />} />
-          <Route path="/healthcare/results" element={<DiagnosticResults onFeedback={() => setShowFeedbackModal(true)} />} />
-          <Route path="/healthcare/history" element={<ReportHistory />} />
-          <Route path="/healthcare/feedback" element={<HealthcareFeedbackSystem />} />
-          <Route path="/healthcare/guidelines" element={<ClinicalGuidelines />} />
-          <Route path="/healthcare/compare" element={<CaseComparison />} />
-          <Route path="/healthcare/settings" element={<Settings />} />
-        </Route>
-
-       
-        <Route path="/patient/login" element={<PatientSignIn />} />
-        <Route path="/patient/register" element={<PatientSignUp />} />
-        <Route path="/patient/loading" element={<AnalysisLoading />} /> 
-        <Route path="/patient/results" element={<PatientAnalysisResults />} /> 
-  
-       
-        <Route element={<ProtectedRoute />}>
+      
+        <Routes>
+          {/* --- GENERAL AND STANDALONE ROUTES (NO SIDEBAR) --- */}
+          <Route path="/" element={<RoleSelection />} />
+          <Route path="/loading" element={<AnalysisLoading />} />
+          <Route path="/recover-password" element={<PasswordRecovery />} />
           
+          {/* --- HEALTHCARE PROFESSIONAL STANDALONE ROUTES (NO SIDEBAR) --- */}
+          <Route path="/healthcare/login" element={<HealthcareProfessionalLogin />} />
+          <Route path="/healthcare/register" element={<HealthcareProfessionalRegistration />} />
+          <Route path="/healthcare/verify" element={<HealthcareProfessionalVerification />} />
+          
+          {/* --- HEALTHCARE PORTAL ROUTES (WITH SIDEBAR) --- */}
+          
+          <Route element={<HealthcareLayout />}>
+            <Route path="/healthcare/dashboard" element={<HealthcareProfessionalDashboard />} />
+            <Route path="/healthcare/upload" element={<HealthcareDataUpload />} />
+            <Route path="/healthcare/results" element={<DiagnosticResults onFeedback={() => setShowFeedbackModal(true)} />} />
+            <Route path="/healthcare/history" element={<ReportHistory />} />
+            <Route path="/healthcare/feedback" element={<HealthcareFeedbackSystem />} />
+            <Route path="/healthcare/guidelines" element={<ClinicalGuidelines />} />
+            <Route path="/healthcare/compare" element={<CaseComparison />} />
+            <Route path="/healthcare/settings" element={<Settings />} />
+          </Route>
+
+          {/* --- PATIENT FLOW (This structure remains correct) --- */}
+          <Route path="/patient/login" element={<PatientSignIn />} />
+          <Route path="/patient/register" element={<PatientSignUp />} />
+          <Route path="/patient/loading" element={<AnalysisLoading />} /> 
+          <Route path="/patient/results" element={<PatientAnalysisResults />} /> 
+ 
+          {/* Patient pages that USE the dashboard layout (WITH SIDEBAR) */}
           <Route path="/patient" element={<PatientDashboard />}>
             <Route index element={<Navigate to="/patient/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardHome />} />
-            <Route path="upload" element={<PatientUploadPage />} />
+            <Route path="upload" element={<PatientDataUpload />} />
             <Route path="reports" element={<PatientMyReports />} />
             <Route path="history" element={<PatientHistory />} />
             <Route path="settings" element={<PatientAccountSettings />} />
             <Route path="help" element={<PatientHelpSupport />} />
           </Route>
-        </Route>
-        
 
-        {/* Catch-all route for 404 Not Found */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+            
+
+          {/*catch-all route for 404 Not Found */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
       
+
       <FeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
       <Toaster />
-    </>
+
   );
-}
+   
+
+
+  
+</>
+  )}
