@@ -87,7 +87,7 @@ export function HealthcareDataUpload() {
   });
 
   const uploadZones = [
-    { id: "images", label: "Medical Images", icon: Image, formats: "JPEG, PNG, DICOM", maxSize: "100MB" },
+    { id: "images", label: "Medical Images", icon: Image, formats: "JPG, JPEG, PNG, DICOM", maxSize: "100MB" },
     { id: "notes", label: "Clinical Notes", icon: FileText, formats: "PDF, DOC, TXT", maxSize: "50MB" },
     { id: "labs", label: "Lab Results", icon: FlaskConical, formats: "PDF, CSV, Excel", maxSize: "50MB" },
     { id: "genetic", label: "Genetic Data", icon: Dna, formats: "VCF, BAM, FASTQ", maxSize: "50MB" },
@@ -197,7 +197,48 @@ export function HealthcareDataUpload() {
       }
       
       toast.success("Diagnostic case and records created successfully!");
-      navigate('/loading');
+      //call the ai diagnosis endpoint
+const imageForAI = files.images.find(f => f.status === 'success');
+
+if (imageForAI) {
+  toast.info("Sending data for AI analysis...");
+  const aiFormData = new FormData();
+  aiFormData.append('image', imageForAI.file);
+  aiFormData.append('text_input', `Chief Complaint: ${chiefComplaint}\n\nRelevant Medical History: ${medicalHistory}`);
+
+  try {
+    const aiResponse = await axios.post('/api/diagnose/', aiFormData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const aiResultJson = aiResponse.data.diagnosis; 
+          
+          toast.success("AI analysis complete!");
+          
+          navigate('/healthcare/results', { 
+            state: { 
+              result: aiResultJson // Pass the complete JSON object directly
+            } 
+          });
+
+  } catch (aiError: any) {
+    console.error("AI analysis failed:", aiError);
+    const errorMsg = aiError.response?.data?.error || "AI analysis failed.";
+    toast.error(errorMsg);
+    
+    
+    const errorResult = {
+        error: "Failed to get a response from the AI model.",
+        raw_output: errorMsg
+    };
+    navigate('/healthcare/results', { state: { result: errorResult } });
+  }
+
+} else {
+  toast.info("No image provided for automated analysis.");
+  navigate('/loading');
+}
+
 
     } catch (error: any) {
       console.error("Failed to create diagnostic case and records:", error);

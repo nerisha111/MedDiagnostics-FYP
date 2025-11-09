@@ -5,7 +5,12 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.conf import settings
+import requests
+import json
+import logging
 
+logger = logging.getLogger(__name__)
 from .models import (
     User, Patient, Clinician, Model, Clinicalguideline,
     Diagnosticcase, Diagnosticinput, Diagnosis, Recommendation
@@ -19,9 +24,6 @@ from .serializers import (
 )
 from .permissions import IsOwner
 
-# ==============================================================================
-# Custom Views (Not Tied to Models)
-# ==============================================================================
 
 class RoleSelectionAPIView(APIView):
     """
@@ -44,11 +46,76 @@ class RoleSelectionAPIView(APIView):
             }
         ]
         return Response(roles)
+    
 
-# ==============================================================================
-# Model-Based API Views
-# ==============================================================================
 
+class AIDiagnosisAPIView(APIView):
+    """
+    Accepts image and text input, forwards it to the AI inference service,
+    and returns the AI's diagnosis.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        text_input = request.data.get('text_input', '')
+        image_file = request.FILES.get('image', None)
+
+        if not text_input and not image_file:
+            return Response(
+                {'error': 'Please provide text, an image, or both.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ai_url = settings.AI_API_URL
+        files = {}
+        if image_file:
+            files['image'] = (image_file.name, image_file.read(), image_file.content_type)
+
+       
+        data = {
+            'question': text_input
+        }
+
+        try:
+            response = requests.post(ai_url, data=data, files=files, timeout=180)
+            response.raise_for_status()
+            ai_response_data = response.json()
+            json_string_from_ai = ai_response_data.get('result') 
+            try:
+                
+                diagnosis_json = json.loads(json_string_from_ai)
+                return Response(
+                    {'diagnosis': diagnosis_json},
+                    status=status.HTTP_200_OK
+                )
+            except json.JSONDecodeError as e:
+                logger.error(f"AI returned malformed JSON: {e}", exc_info=True)
+                return Response(
+                    {'error': 'AI returned malformed data. Could not parse JSON.', 'raw_output': json_string_from_ai},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+
+        except requests.exceptions.RequestException as e:
+            
+            return Response(
+                {'error': f'The AI service returned an error: {e}'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            # Handle other unexpected errors
+            return Response(
+                {'error': f'An unexpected error occurred in the backend: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+       
+        return Response(
+            {'error': 'An unknown error occurred in the view and no response was generated.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+            
+    
 # --- User Profiles ---
 class UserListAPIView(generics.ListAPIView):
     queryset = User.objects.all()
@@ -152,9 +219,6 @@ class ClinicalGuidelineDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clinicalguideline.objects.all()
     serializer_class = ClinicalGuidelineSerializer
 
-# ==============================================================================
-# REGISTRATION VIEWS
-# ==============================================================================
 
 class ClinicianRegistrationAPIView(generics.CreateAPIView):
     queryset = Clinician.objects.all()
@@ -195,3 +259,24 @@ class PatientRegistrationAPIView(generics.CreateAPIView):
             {"message": "Patient registered successfully."},
             status=status.HTTP_201_CREATED
         )
+    
+class UserProfileMeAPIView(APIView):
+    """
+    API view to retrieve the profile of the currently authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        
+        user = request.user
+        
+        
+        if hasattr(user, 'patient'):
+            serializer = PatientSerializer(user.patient)
+        elif hasattr(user, 'clinician'):
+            serializer = ClinicianSerializer(user.clinician)
+        else:
+            
+            return Response({"error": "User has no patient or clinician profile."}, status=status.HTTP_404_NOT_FOUND)
+            
+        return Response(serializer.data, status=status.HTTP_200_OK)

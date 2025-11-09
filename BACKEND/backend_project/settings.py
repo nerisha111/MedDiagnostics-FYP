@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'a-default-secret-key-for-safety')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []  # Add your domains in production
+ALLOWED_HOSTS = []  
 
 # Application definition
 INSTALLED_APPS = [
@@ -47,6 +47,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
 ]
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+]
 
 # Supabase credentials
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -55,6 +59,12 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     raise RuntimeError("Supabase credentials are not configured in Django settings.")
+
+#ai service config
+AI_API_URL = os.getenv('AI_API_URL')
+
+if not AI_API_URL:
+    raise RuntimeError("AI_API_URL is not configured in the .env file.")
 
 # REST framework configuration
 REST_FRAMEWORK = {
@@ -116,3 +126,32 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO", 
+            "propagate": True,
+        },
+        "api": { # <-- This is the key part
+            "handlers": ["console"],
+            "level": "DEBUG", 
+            "propagate": True,
+        },
+    },
+}

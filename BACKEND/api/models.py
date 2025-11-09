@@ -15,9 +15,7 @@ class User(models.Model):
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     
-    # --- THIS IS THE ONLY CHANGE ---
-    # These properties make our custom User model compatible with Django's
-    # built-in permission checks (like IsAuthenticated).
+  
 
     @property
     def is_authenticated(self):
@@ -34,7 +32,7 @@ class User(models.Model):
         For now, we'll consider all existing users to be active.
         """
         return True
-    # --- END OF CHANGE ---
+  
 
     class Meta:
         managed = False

@@ -4,17 +4,15 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # This is the line that was missing from Django's list
+    
     path('roles/', views.RoleSelectionAPIView.as_view(), name='role-selection'),
-
-    # --- User and Profile URLs ---
+    path('diagnose/', views.AIDiagnosisAPIView.as_view(), name='ai-diagnose'),
     path('users/', views.UserListAPIView.as_view(), name='user-list'),
     path('users/<uuid:pk>/', views.UserDetailAPIView.as_view(), name='user-detail'),
-
     path('patients/', views.PatientListAPIView.as_view(), name='patient-list'),
     path('patients/<uuid:pk>/', views.PatientDetailAPIView.as_view(), name='patient-detail'),
 
-    # ... and all your other URLs
+ 
     path('clinicians/', views.ClinicianListAPIView.as_view(), name='clinician-list'),
     path('clinicians/<uuid:pk>/', views.ClinicianDetailAPIView.as_view(), name='clinician-detail'),
     path('cases/', views.DiagnosticCaseListCreateAPIView.as_view(), name='case-list-create'),
@@ -33,5 +31,6 @@ urlpatterns = [
     path('register/patient/', views.PatientRegistrationAPIView.as_view(), name='patient-register'),
     path('inputs/bulk-create/', views.DiagnosticInputBulkCreateAPIView.as_view(), name='input-bulk-create'),
     path('inputs/<uuid:pk>/', views.DiagnosticInputDetailAPIView.as_view(), name='input-detail'),
-    path('inputs/', views.DiagnosticInputListCreateAPIView.as_view(), name='input-list-create')
+    path('inputs/', views.DiagnosticInputListCreateAPIView.as_view(), name='input-list-create'),
+    path('profile/me/', views.UserProfileMeAPIView.as_view(), name='user-profile-me'),
 ]

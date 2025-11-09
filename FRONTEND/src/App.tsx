@@ -45,15 +45,6 @@ export default function App() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
    const [notes, setNotes] = useState<Note[]>([]);
 
-
-  // Fetch notes from Django backend
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/notes/") // full URL to backend
-      .then((res) => res.json())
-      .then((data) => setNotes(data))
-      .catch((err) => console.error("Error fetching notes:", err));
-  }, []);
-
 function handleNoteAdded(newNote: Note) {
   setNotes((prev) => [newNote, ...prev]);
 }
@@ -63,17 +54,17 @@ function handleNoteAdded(newNote: Note) {
     <>
       
         <Routes>
-          {/* --- GENERAL AND STANDALONE ROUTES (NO SIDEBAR) --- */}
+       
           <Route path="/" element={<RoleSelection />} />
           <Route path="/loading" element={<AnalysisLoading />} />
           <Route path="/recover-password" element={<PasswordRecovery />} />
           
-          {/* --- HEALTHCARE PROFESSIONAL STANDALONE ROUTES (NO SIDEBAR) --- */}
+         
           <Route path="/healthcare/login" element={<HealthcareProfessionalLogin />} />
           <Route path="/healthcare/register" element={<HealthcareProfessionalRegistration />} />
           <Route path="/healthcare/verify" element={<HealthcareProfessionalVerification />} />
           
-          {/* --- HEALTHCARE PORTAL ROUTES (WITH SIDEBAR) --- */}
+          
           
           <Route element={<HealthcareLayout />}>
             <Route path="/healthcare/dashboard" element={<HealthcareProfessionalDashboard />} />
@@ -86,13 +77,13 @@ function handleNoteAdded(newNote: Note) {
             <Route path="/healthcare/settings" element={<Settings />} />
           </Route>
 
-          {/* --- PATIENT FLOW (This structure remains correct) --- */}
+     
           <Route path="/patient/login" element={<PatientSignIn />} />
           <Route path="/patient/register" element={<PatientSignUp />} />
           <Route path="/patient/loading" element={<AnalysisLoading />} /> 
           <Route path="/patient/results" element={<PatientAnalysisResults />} /> 
  
-          {/* Patient pages that USE the dashboard layout (WITH SIDEBAR) */}
+          
           <Route path="/patient" element={<PatientDashboard />}>
             <Route index element={<Navigate to="/patient/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardHome />} />
@@ -102,8 +93,6 @@ function handleNoteAdded(newNote: Note) {
             <Route path="settings" element={<PatientAccountSettings />} />
             <Route path="help" element={<PatientHelpSupport />} />
           </Route>
-
-            
 
           {/*catch-all route for 404 Not Found */}
           <Route path="*" element={<NotFoundPage />} />
