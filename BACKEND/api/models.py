@@ -8,15 +8,15 @@ import uuid
 
 class User(models.Model):
     id = models.UUIDField(primary_key=True, editable=False) 
+    supabase_user_id = models.UUIDField(unique=True, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
     first_name = models.CharField(max_length=255, blank=True, null=True)
     last_name = models.CharField(max_length=255, blank=True, null=True)
     gender = models.CharField(max_length=50, blank=True, null=True)
+    role = models.CharField(max_length=100, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     
-  
-
     @property
     def is_authenticated(self):
         """
@@ -32,7 +32,6 @@ class User(models.Model):
         For now, we'll consider all existing users to be active.
         """
         return True
-  
 
     class Meta:
         managed = False

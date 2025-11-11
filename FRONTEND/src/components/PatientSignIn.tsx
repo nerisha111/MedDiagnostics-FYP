@@ -1,12 +1,11 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabaseClient"; // <-- 1. Import Supabase client
+import { supabase } from "../supabaseClient";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { toast } from "sonner"; // <-- 2. Import toast for notifications
+import { toast } from "sonner";
 import { Eye, EyeOff, Shield, ArrowLeft, Loader2 } from "lucide-react";
 
 export function PatientSignIn() {
@@ -16,13 +15,10 @@ export function PatientSignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [touched, setTouched] = useState({ email: false, password: false });
-
-  // --- 3. Add state for loading and server errors ---
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const validateForm = () => {
-    // (This validation function is good, no changes needed here)
     const newErrors = { email: "", password: "" };
     let isValid = true;
 
@@ -43,42 +39,68 @@ export function PatientSignIn() {
     return isValid;
   };
 
-  // --- 4. Rewrite the handleSubmit function completely ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setServerError(null); // Clear previous errors
+    setServerError(null);
     setTouched({ email: true, password: true });
 
     if (validateForm()) {
       setIsSubmitting(true);
       try {
-        // This is the crucial step: Call Supabase to sign in
-        const { error } = await supabase.auth.signInWithPassword({
+        // Step 1: Authenticate with Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email,
           password: password,
         });
 
-        // If Supabase returns an error (e.g., "Invalid login credentials"), throw it
-        if (error) {
-          throw error;
+        if (error) throw error;
+
+        if (!data.user) {
+          throw new Error("Login failed: No user data returned");
         }
 
-        // If successful, show a success message and navigate to the dashboard
+        // Step 2: Verify user role from database
+        const { data: userData, error: dbError } = await supabase
+          .from('User')
+          .select('role')
+          .eq('supabase_user_id', data.user.id)
+          .single();
+
+        if (dbError) {
+          console.error('Database error:', dbError);
+          await supabase.auth.signOut();
+          throw new Error("Unable to verify your account. Please contact support.");
+        }
+
+        if (!userData) {
+          await supabase.auth.signOut();
+          throw new Error("User profile not found. Please contact support.");
+        }
+
+        // Step 3: Check if user has patient role
+        const userRole = userData.role;
+
+        if (userRole !== 'patient') {
+          // User is not a patient
+          await supabase.auth.signOut();
+          setServerError("Access Denied: This portal is for patients only. Please use the healthcare professional portal.");
+          toast.error("Access Denied: You don't have permission to access this portal.");
+          return;
+        }
+
+        // Step 4: Success - navigate to dashboard
         toast.success("Login successful! Welcome back.");
         navigate('/patient/dashboard');
 
       } catch (error: any) {
-        // Catch any errors and display them to the user
         const errorMessage = error.message || "An unknown error occurred.";
         setServerError(errorMessage);
         toast.error(`Login failed: ${errorMessage}`);
       } finally {
-        // Ensure the loading state is turned off, whether it succeeded or failed
         setIsSubmitting(false);
       }
     }
   };
-
 
   const handleBlur = (field: "email" | "password") => {
     setTouched({ ...touched, [field]: true });
@@ -121,6 +143,7 @@ export function PatientSignIn() {
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => handleBlur("email")}
                   className={touched.email && errors.email ? "border-[#E63946]" : ""}
+                  disabled={isSubmitting}
                 />
                 {touched.email && errors.email && (
                   <p className="text-sm text-[#E63946]">{errors.email}</p>
@@ -130,7 +153,12 @@ export function PatientSignIn() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-                  <button type="button" onClick={() => navigate('/recover-password')} className="text-xs text-primary hover:underline">
+                  <button 
+                    type="button" 
+                    onClick={() => navigate('/recover-password')} 
+                    className="text-xs text-primary hover:underline"
+                    disabled={isSubmitting}
+                  >
                     Forgot Password?
                   </button>
                 </div>
@@ -143,8 +171,14 @@ export function PatientSignIn() {
                     onChange={(e) => setPassword(e.target.value)}
                     onBlur={() => handleBlur("password")}
                     className={`pr-10 ${touched.password && errors.password ? "border-[#E63946]" : ""}`}
+                    disabled={isSubmitting}
                   />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isSubmitting}
+                  >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -153,13 +187,17 @@ export function PatientSignIn() {
                 )}
               </div>
 
-              {/* --- 5. Display server error message to the user --- */}
               {serverError && (
-                <p className="text-sm text-center text-[#E63946] bg-red-50 p-3 rounded-md">{serverError}</p>
+                <div className="text-sm text-center text-destructive p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                  {serverError}
+                </div>
               )}
 
-              {/* --- 6. Update Button to show loading state --- */}
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                className="w-full bg-primary hover:bg-primary/90" 
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</>
                 ) : ( "Login" )}
@@ -178,7 +216,12 @@ export function PatientSignIn() {
             </div>
 
             <div className="text-center">
-              <button type="button" onClick={() => navigate('/patient/register')} className="text-primary hover:underline">
+              <button 
+                type="button" 
+                onClick={() => navigate('/patient/register')} 
+                className="text-primary hover:underline"
+                disabled={isSubmitting}
+              >
                 Register as Patient
               </button>
             </div>

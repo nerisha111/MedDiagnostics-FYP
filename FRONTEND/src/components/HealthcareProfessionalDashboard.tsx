@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { Loader2 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -36,6 +38,27 @@ import { Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis
 
 export function HealthcareProfessionalDashboard() {
   const navigate = useNavigate();
+
+   const { user, loading, isAuthorized } = useAuth({ 
+    requiredRole: 'clinician',
+    redirectTo: '/healthcare/login'
+  });
+
+  // Show loading state while validating
+  if (loading || !isAuthorized) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Verifying your credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
   
 
   

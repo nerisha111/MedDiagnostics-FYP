@@ -1,12 +1,10 @@
-import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { supabase } from "../supabaseClient"; // Ensure this path is correct
+import { supabase } from "../supabaseClient";
+import { useAuth } from "../hooks/useAuth";
 
 // UI Components
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-
-// Custom Hooks
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 // Icons
@@ -24,19 +22,12 @@ import {
   Loader2, 
 } from "lucide-react";
 
-// --- TypeScript Interface ---
-interface User {
-  first_name: string;
-  last_name: string;
-}
-
 // --- Child Page Components ---
-
 export function DashboardHome() {
   const navigate = useNavigate();
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">Here’s a summary of your recent activity and health status.</p>
+      <p className="text-muted-foreground">Here's a summary of your recent activity and health status.</p>
       <main className="space-y-6">
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center gap-4 space-y-0">
@@ -61,7 +52,6 @@ export function DashboardHome() {
             </CardContent>
           </Card>
           <Card>
-            {/* --- FIX 1: Corrected the closing tag from </Header> to </CardHeader> --- */}
             <CardHeader><CardTitle className="flex items-center gap-2"><ArrowRight className="w-5 h-5" /><span>Quick Access</span></CardTitle></CardHeader>
             <CardContent className="flex flex-col space-y-3">
               <Button variant="outline" className="justify-start" onClick={() => navigate('/patient/reports')}><FileCheck className="w-4 h-4 mr-2" /> View All My Reports</Button>
@@ -82,45 +72,17 @@ export const AccountSettings = () => <div className="space-y-6"><p className="te
 export const Help = () => <div className="space-y-6"><p className="text-muted-foreground">The Help & Support page will be here.</p></div>;
 
 /**
- * Main Patient Dashboard Layout Component
+ * Main Patient Dashboard Layout Component with Role-Based Access Control
  */
 export function PatientDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkSessionAndFetchUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          navigate('/patient/login');
-          return;
-        }
-        const { user: authUser } = session;
-        const { data, error } = await supabase
-          .from('User')
-          .select('first_name, last_name')
-          .eq('supabase_user_id', authUser.id)
-          .single();
-        if (error) throw error;
-        if (data) {
-          setUser(data);
-        } else {
-          console.warn("User is authenticated but no profile was found in the 'User' table.");
-          await supabase.auth.signOut();
-          navigate('/patient/login');
-        }
-      } catch (error) {
-        console.error("Error checking session or fetching user data:", error);
-        navigate('/patient/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkSessionAndFetchUser();
-  }, [navigate]);
+  
+  // Use the secure auth hook with role validation
+  const { user, loading, isAuthorized } = useAuth({ 
+    requiredRole: 'patient',
+    redirectTo: '/patient/login'
+  });
 
   const menuItems = [
     { id: "dashboard", icon: LayoutDashboard, label: "Dashboard", path: "/patient/dashboard", description: "View your health summary and recent activity." },
@@ -144,17 +106,26 @@ export function PatientDashboard() {
     navigate('/');
   };
   
-  const getInitials = (user: User | null): string => {
-    if (!user || !user.first_name || !user.last_name) return '';
-    return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+  const getInitials = (): string => {
+    if (!user || !user.firstName || !user.lastName) return '';
+    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
   };
 
-  if (loading || !user) {
+  // Show loading state while validating
+  if (loading || !isAuthorized) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Verifying your credentials...</p>
+        </div>
       </div>
     );
+  }
+
+  // Only render dashboard if user is authorized
+  if (!user) {
+    return null;
   }
 
   return (
@@ -167,11 +138,11 @@ export function PatientDashboard() {
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold">{getInitials(user)}</span>
+              <span className="text-primary font-bold">{getInitials()}</span>
             </div>
             <div>
-              <p className="font-semibold">{`${user.first_name} ${user.last_name}`}</p>
-              <p className="text-xs text-muted-foreground">Last login: Today</p>
+              <p className="font-semibold">{`${user.firstName} ${user.lastName}`}</p>
+              <p className="text-xs text-muted-foreground">Patient</p>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-// src/components/DiagnosticResults.tsx
+// src/components/DiagnosticResults.tsx - Enhanced Version with Clinical Guidelines
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from "react";
@@ -7,12 +7,13 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Download, FileText, MessageSquare, Image, FlaskConical, Dna, CheckCircle2,
-  Info, ExternalLink, TrendingUp, Activity, ArrowLeft, AlertCircle
+  Info, ExternalLink, TrendingUp, Activity, ArrowLeft, AlertCircle, 
+  Stethoscope, Pill, TestTube, BookOpen, Shield, Clock, AlertTriangle
 } from "lucide-react";
 import { toast } from 'sonner';
-
 
 interface PrimaryDiagnosis {
   name: string;
@@ -21,22 +22,69 @@ interface PrimaryDiagnosis {
   icd10?: string;
   riskLevel?: string;
 }
+
 interface DifferentialDiagnosis {
-  name:string;
+  name: string;
   confidence: number;
 }
+
 interface NextStep {
   category: string;
   action: string;
   priority?: number;
   description?: string;
 }
+
+interface ClinicalGuideline {
+  id?: string;
+  diagnosis_name?: string;
+  icd10_code?: string;
+  summary?: string;
+  keyRecommendations?: string[];
+  evidenceLevel?: string;
+  source?: string;
+  last_updated?: string;
+  guideline_url?: string;
+}
+
+interface RecommendedTest {
+  id?: string;
+  test_name?: string;
+  name?: string;
+  category?: string;
+  test_category?: string;
+  rationale?: string;
+  description?: string;
+  priority?: string;
+  typical_cost?: string;
+  turnaround_time?: string;
+}
+
+interface RecommendedTreatment {
+  id?: string;
+  treatment_name?: string;
+  name?: string;
+  category?: string;
+  treatment_category?: string;
+  description?: string;
+  dosage?: string;
+  duration?: string;
+  side_effects?: string;
+  contraindications?: string;
+  line?: string;
+  treatment_line?: string;
+}
+
 interface AnalysisResult {
   primaryDiagnosis: PrimaryDiagnosis;
   differentialDiagnoses: DifferentialDiagnosis[];
   findings: string[];
   nextSteps: NextStep[];
-  error?: string; 
+  clinicalGuidelines?: ClinicalGuideline;
+  recommendedTests?: RecommendedTest[];
+  recommendedTreatments?: RecommendedTreatment[];
+  dataSource?: string;
+  error?: string;
   raw_output?: string;
 }
 
@@ -53,8 +101,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
   const location = useLocation();
   const state = location.state as LocationState | null;
 
-  console.log("Data received by DiagnosticResults page:", state);
-
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -62,7 +108,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
     if (state?.result) {
       if (state.result.error) {
         toast.error(state.result.error);
-        console.error("AI Raw Output:", state.result.raw_output);
       }
       setAnalysis(state.result);
       setIsLoading(false);
@@ -72,7 +117,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
     }
   }, [state, navigate]);
 
-  if (isLoading) {
+  if (isLoading || !analysis) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -83,93 +128,47 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
     );
   }
 
-  if (!analysis) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-2xl mx-auto text-center">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
-          <h1 className="text-2xl font-bold mb-4">Analysis Data Not Found</h1>
-          <Card className="p-6">
-            <p className="text-muted-foreground mb-4">The component did not receive valid analysis data.</p>
-            <Button onClick={() => navigate('/healthcare/upload')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back to Upload
-            </Button>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  console.log("Rendering with this analysis data:", analysis);
-
-  if (analysis.error) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-3xl mx-auto">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
-          <h1 className="text-2xl font-bold text-center mb-4 text-destructive">AI Analysis Failed</h1>
-          <Card className="p-6">
-            <h3 className="font-semibold mb-2">Error Message:</h3>
-            <p className="text-destructive mb-4">{analysis.error}</p>
-            <h3 className="font-semibold">Technical Details:</h3>
-            <pre className="mt-2 p-4 bg-muted rounded-md whitespace-pre-wrap text-sm font-mono overflow-x-auto">
-              {analysis.raw_output || "No raw output available."}
-            </pre>
-            <Button onClick={() => navigate('/healthcare/upload')} className="mt-6">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!analysis.primaryDiagnosis) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-2xl mx-auto text-center">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
-          <h1 className="text-2xl font-bold mb-4">Incomplete Analysis Data</h1>
-          <p className="text-muted-foreground">The analysis did not return a complete diagnosis.</p>
-          <Button onClick={() => navigate('/healthcare/upload')} className="mt-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Helper function to get confidence color
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return "text-green-500";
     if (confidence >= 60) return "text-yellow-500";
     return "text-orange-500";
   };
 
-  const getConfidenceBgColor = (confidence: number) => {
-    if (confidence >= 80) return "bg-green-500";
-    if (confidence >= 60) return "bg-yellow-500";
-    return "bg-orange-500";
-  };
-
-  // Helper to get category icon
   const getCategoryIcon = (category: string) => {
     const cat = category.toLowerCase();
     if (cat.includes('imaging')) return <Image className="w-4 h-4" />;
     if (cat.includes('lab') || cat.includes('test')) return <FlaskConical className="w-4 h-4" />;
-    if (cat.includes('treatment') || cat.includes('medication')) return <Activity className="w-4 h-4" />;
+    if (cat.includes('treatment') || cat.includes('medication') || cat.includes('pharmacological')) 
+      return <Pill className="w-4 h-4" />;
     if (cat.includes('follow') || cat.includes('review')) return <CheckCircle2 className="w-4 h-4" />;
+    if (cat.includes('lifestyle')) return <Activity className="w-4 h-4" />;
     return <Info className="w-4 h-4" />;
+  };
+
+  const getPriorityBadge = (priority?: string) => {
+    if (!priority) return null;
+    const p = priority.toLowerCase();
+    if (p.includes('high') || p.includes('urgent'))
+      return <Badge variant="destructive" className="text-xs">High Priority</Badge>;
+    if (p.includes('medium') || p.includes('moderate'))
+      return <Badge variant="secondary" className="text-xs">Medium Priority</Badge>;
+    return <Badge variant="outline" className="text-xs">Low Priority</Badge>;
+  };
+
+  const getEvidenceColor = (level?: string) => {
+    if (!level) return "text-muted-foreground";
+    const l = level.toUpperCase();
+    if (l === 'A') return "text-green-600";
+    if (l === 'B') return "text-blue-600";
+    if (l === 'C') return "text-yellow-600";
+    return "text-muted-foreground";
   };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1600px] mx-auto p-4 sm:p-8 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <Button 
               variant="outline" 
@@ -179,27 +178,33 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Diagnostic Results</h1>
-              <p className="text-muted-foreground">
-                Case ID: PT-2024-{Math.random().toString(36).substr(2, 6).toUpperCase()} • {new Date().toLocaleDateString()}
+              <h1 className="text-3xl font-bold">Comprehensive Diagnostic Report</h1>
+              <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                Case ID: PT-2024-{Math.random().toString(36).substr(2, 6).toUpperCase()} • 
+                {new Date().toLocaleDateString()}
+                {analysis.dataSource && (
+                  <Badge variant="outline" className="ml-2">
+                    {analysis.dataSource === "Clinical Database" ? "📚 Evidence-Based" : "🤖 AI-Generated"}
+                  </Badge>
+                )}
               </p>
             </div>
           </div>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
-            Export PDF
+            Export Report
           </Button>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Primary Diagnosis Card */}
+            {/* Primary Diagnosis */}
             <Card className="p-6 border-l-4 border-l-primary">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <Badge variant="outline" className="text-xs">Primary Diagnosis</Badge>
                       {analysis.primaryDiagnosis?.icd10 && (
                         <Badge variant="secondary" className="text-xs">
@@ -227,22 +232,250 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                       {analysis.primaryDiagnosis?.confidence}%
                     </span>
                   </div>
-                  <Progress 
-                    value={analysis.primaryDiagnosis?.confidence || 0} 
-                    className="h-2"
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {analysis.primaryDiagnosis?.confidence >= 80 
-                      ? "High confidence - Diagnosis strongly supported by findings"
-                      : analysis.primaryDiagnosis?.confidence >= 60
-                      ? "Moderate confidence - Additional tests may be beneficial"
-                      : "Lower confidence - Further investigation recommended"}
-                  </p>
+                  <Progress value={analysis.primaryDiagnosis?.confidence || 0} className="h-2" />
                 </div>
               </div>
             </Card>
 
-            {/* Differential Diagnoses Card */}
+            {/* Clinical Guidelines Section */}
+            {analysis.clinicalGuidelines && Object.keys(analysis.clinicalGuidelines).length > 0 && (
+              <Card className="p-6 border-l-4 border-l-blue-500">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <BookOpen className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">Clinical Guidelines</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Evidence-based management recommendations
+                        </p>
+                      </div>
+                    </div>
+                    {analysis.clinicalGuidelines.evidenceLevel && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs font-semibold ${getEvidenceColor(analysis.clinicalGuidelines.evidenceLevel)}`}
+                      >
+                        Evidence Level: {analysis.clinicalGuidelines.evidenceLevel}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {analysis.clinicalGuidelines.summary && (
+                    <div className="bg-muted/30 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 text-sm">Clinical Overview</h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.clinicalGuidelines.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {analysis.clinicalGuidelines.keyRecommendations && 
+                   analysis.clinicalGuidelines.keyRecommendations.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-3 text-sm flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-blue-500" />
+                        Key Clinical Recommendations
+                      </h4>
+                      <ul className="space-y-2">
+                        {analysis.clinicalGuidelines.keyRecommendations.map((rec, idx) => (
+                          <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                            <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <span className="text-sm leading-relaxed">{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+                    <span>
+                      Source: {analysis.clinicalGuidelines.source || "Clinical Database"}
+                    </span>
+                    {analysis.clinicalGuidelines.guideline_url && (
+                      <Button variant="link" size="sm" className="h-auto p-0">
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        View Full Guideline
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Tabbed Section for Tests and Treatments */}
+            <Tabs defaultValue="tests" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="tests" className="flex items-center gap-2">
+                  <TestTube className="w-4 h-4" />
+                  Recommended Tests
+                  {analysis.recommendedTests && analysis.recommendedTests.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{analysis.recommendedTests.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="treatments" className="flex items-center gap-2">
+                  <Pill className="w-4 h-4" />
+                  Treatment Options
+                  {analysis.recommendedTreatments && analysis.recommendedTreatments.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{analysis.recommendedTreatments.length}</Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Recommended Tests Tab */}
+              <TabsContent value="tests" className="space-y-4 mt-4">
+                {analysis.recommendedTests && analysis.recommendedTests.length > 0 ? (
+                  <div className="space-y-3">
+                    {analysis.recommendedTests.map((test, idx) => (
+                      <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="p-2 bg-primary/10 rounded-lg">
+                                {getCategoryIcon(test.category || test.test_category || "")}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="font-semibold text-sm">
+                                    {test.test_name || test.name}
+                                  </h4>
+                                  {getPriorityBadge(test.priority)}
+                                </div>
+                                <Badge variant="outline" className="text-xs mb-2">
+                                  {test.category || test.test_category || "Diagnostic"}
+                                </Badge>
+                                {(test.rationale || test.description) && (
+                                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                                    {test.rationale || test.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {(test.turnaround_time || test.typical_cost) && (
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
+                              {test.turnaround_time && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {test.turnaround_time}
+                                </div>
+                              )}
+                              {test.typical_cost && (
+                                <div className="flex items-center gap-1">
+                                  <span>💰</span>
+                                  {test.typical_cost}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="p-8 text-center">
+                    <TestTube className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground">
+                      No specific tests recommended in database. 
+                      Consult with healthcare provider for appropriate diagnostic workup.
+                    </p>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Treatment Options Tab */}
+              <TabsContent value="treatments" className="space-y-4 mt-4">
+                {analysis.recommendedTreatments && analysis.recommendedTreatments.length > 0 ? (
+                  <div className="space-y-3">
+                    {analysis.recommendedTreatments.map((treatment, idx) => (
+                      <Card key={idx} className="p-4 hover:shadow-md transition-shadow">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="p-2 bg-green-500/10 rounded-lg">
+                                <Pill className="w-4 h-4 text-green-500" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="font-semibold text-sm">
+                                    {treatment.treatment_name || treatment.name}
+                                  </h4>
+                                  {(treatment.line || treatment.treatment_line) && (
+                                    <Badge 
+                                      variant={(treatment.line || treatment.treatment_line)?.toLowerCase().includes('first') ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {treatment.line || treatment.treatment_line}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Badge variant="outline" className="text-xs mb-2">
+                                  {treatment.category || treatment.treatment_category || "Treatment"}
+                                </Badge>
+                                {treatment.description && (
+                                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                                    {treatment.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Treatment Details */}
+                          <div className="space-y-2 pt-2 border-t">
+                            {treatment.dosage && (
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs font-medium text-muted-foreground min-w-[80px]">Dosage:</span>
+                                <span className="text-xs text-foreground">{treatment.dosage}</span>
+                              </div>
+                            )}
+                            {treatment.duration && (
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs font-medium text-muted-foreground min-w-[80px]">Duration:</span>
+                                <span className="text-xs text-foreground">{treatment.duration}</span>
+                              </div>
+                            )}
+                            {treatment.side_effects && (
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <span className="text-xs font-medium text-muted-foreground">Side Effects:</span>
+                                  <p className="text-xs text-foreground mt-1">{treatment.side_effects}</p>
+                                </div>
+                              </div>
+                            )}
+                            {treatment.contraindications && (
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <span className="text-xs font-medium text-muted-foreground">Contraindications:</span>
+                                  <p className="text-xs text-foreground mt-1">{treatment.contraindications}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="p-8 text-center">
+                    <Pill className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground">
+                      No specific treatments recommended in database. 
+                      Consult with healthcare provider for appropriate treatment plan.
+                    </p>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {/* Differential Diagnoses */}
             {analysis.differentialDiagnoses && analysis.differentialDiagnoses.length > 0 && (
               <Card className="p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -250,7 +483,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                   <h3 className="text-lg font-semibold">Differential Diagnoses</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Alternative conditions to consider based on the clinical presentation
+                  Alternative conditions to consider based on clinical presentation
                 </p>
                 <div className="space-y-3">
                   {analysis.differentialDiagnoses.map((diagnosis, idx) => (
@@ -261,24 +494,21 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                           {diagnosis.confidence}%
                         </span>
                       </div>
-                      <Progress 
-                        value={diagnosis.confidence} 
-                        className="h-1.5" 
-                      />
+                      <Progress value={diagnosis.confidence} className="h-1.5" />
                     </Card>
                   ))}
                 </div>
               </Card>
             )}
 
-            {/* Key Findings Card */}
+            {/* Key Findings */}
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <FileText className="w-5 h-5 text-primary" />
                 <h3 className="text-lg font-semibold">Key Clinical Findings</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Significant observations from image analysis
+                Significant observations from analysis
               </p>
               <ul className="space-y-3">
                 {analysis.findings?.map((finding, idx) => (
@@ -293,7 +523,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
           
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Confidence Summary Card */}
+            {/* Confidence Summary */}
             <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10">
               <div className="text-center">
                 <div className={`text-5xl font-bold mb-2 ${getConfidenceColor(analysis.primaryDiagnosis?.confidence || 0)}`}>
@@ -303,14 +533,14 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
               </div>
             </Card>
 
-            {/* Recommended Next Steps Card */}
+            {/* Next Steps from Original Analysis */}
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle2 className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-semibold">Recommended Next Steps</h3>
+                <h3 className="text-lg font-semibold">Recommended Actions</h3>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                Clinical actions to support diagnosis and treatment
+                Immediate clinical actions
               </p>
               <div className="space-y-3">
                 {analysis.nextSteps?.map((step, idx) => (
@@ -332,7 +562,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
               </div>
             </Card>
 
-            {/* Disclaimer Card */}
+            {/* Disclaimer */}
             <Card className="p-4 bg-yellow-500/10 border-yellow-500/20">
               <div className="flex gap-3">
                 <Info className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -348,17 +578,17 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
           </div>
         </div>
 
-        {/* Footer Card */}
+        {/* Footer */}
         <Card className="p-4 sticky bottom-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-500" />
                 <span className="text-sm text-muted-foreground">
                   Analysis complete with {analysis.primaryDiagnosis?.confidence || 0}% confidence
                 </span>
               </div>
-              <Separator orientation="vertical" className="h-6" />
+              <Separator orientation="vertical" className="h-6 hidden sm:block" />
               <span className="text-xs text-muted-foreground">
                 Generated by LLaVA-Med AI
               </span>

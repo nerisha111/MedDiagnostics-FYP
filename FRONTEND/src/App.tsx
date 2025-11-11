@@ -33,6 +33,8 @@ import { PatientAnalysisResults } from "./components/PatientAnalysisResults";
 import { PatientSignIn } from "./components/PatientSignIn";
 import { PatientSignUp } from "./components/PatientSignUp";
 import { NotFoundPage } from "./components/NotFoundPage";
+import { ProtectedRoute } from "./ProtectedRoute";
+
 
 
 type Note = {
@@ -84,6 +86,7 @@ function handleNoteAdded(newNote: Note) {
           <Route path="/patient/results" element={<PatientAnalysisResults />} /> 
  
           
+          <Route element={<ProtectedRoute />}>
           <Route path="/patient" element={<PatientDashboard />}>
             <Route index element={<Navigate to="/patient/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardHome />} />
@@ -92,7 +95,10 @@ function handleNoteAdded(newNote: Note) {
             <Route path="history" element={<PatientHistory />} />
             <Route path="settings" element={<PatientAccountSettings />} />
             <Route path="help" element={<PatientHelpSupport />} />
+            <Route path="loading" element={<AnalysisLoading />} /> 
+            <Route path="results" element={<PatientAnalysisResults />} /> 
           </Route>
+        </Route>
 
           {/*catch-all route for 404 Not Found */}
           <Route path="*" element={<NotFoundPage />} />

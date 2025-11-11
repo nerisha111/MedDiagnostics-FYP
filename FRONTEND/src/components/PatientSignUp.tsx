@@ -187,59 +187,104 @@ if (!email.trim()) {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServerError(null);
-    setTouched({
-      firstName: true, lastName: true, dob: true, gender: true, address: true,
-      email: true, password: true, confirmPassword: true, phone: true,
-    });
+  e.preventDefault();
+  setServerError(null);
+  setTouched({
+    firstName: true, lastName: true, dob: true, gender: true, address: true,
+    email: true, password: true, confirmPassword: true, phone: true,
+  });
 
-    if (validateForm()) {
-      setIsSubmitting(true);
-      try {
-        // Step A: Create the user in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: email,
-          password: password,
-          options: {
-            data: {
-              full_name: `${firstName} ${lastName}`,
-              role: 'patient', // Send 'patient' role for the trigger
-            },
+  if (validateForm()) {
+    setIsSubmitting(true);
+    let supabaseUserId: string | null = null;
+
+    try {
+      console.log("🔵 Step 1: Creating user in Supabase...");
+      
+      // Step A: Create the user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: `${firstName} ${lastName}`,
+            role: 'patient',
           },
-        });
+        },
+      });
 
-        if (authError) { throw authError; }
-        if (!authData.user) { throw new Error("Supabase registration failed."); }
+      if (authError) {
+        console.error("Supabase signup error:", authError);
+        throw new Error(`Supabase error: ${authError.message}`);
+      }
 
-        // Step B: Send data to your Django backend
-        const registrationData = {
-          id: authData.user.id, 
-          first_name: firstName,
-          last_name: lastName,
-          gender,
-          date_of_birth: dob,
-          email,
-          phone_number: phone, // Field names should match backend model
-          address,
-        };
+      if (!authData.user) {
+        throw new Error("Supabase did not return a user object.");
+      }
+
+      supabaseUserId = authData.user.id;
+      console.log(" Supabase user created with ID:", supabaseUserId);
+      
+      // IMPORTANT: Sign out immediately after signup to prevent auto-login
+      await supabase.auth.signOut();
+      console.log("🔵 Signed out from Supabase to prevent auto-login");
+
+      // Step B: Send data to Django backend
+      console.log("🔵 Step 2: Registering user in Django...");
+      
+      const registrationData = {
+        id: supabaseUserId,
+        first_name: firstName,
+        last_name: lastName,
+        gender,
+        date_of_birth: dob,
+        email,
+        phone_number: phone,
+        address,
+      };
+      
+      console.log("🔵 Sending registration data:", registrationData);
+
+      const backendResponse = await axios.post(
+        '/api/register/patient/', 
+        registrationData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      console.log("✅ Django registration successful:", backendResponse.data);
+      
+      // Step C: Success - redirect to login
+      toast.success("Registration successful! Please log in with your credentials.");
+      navigate('/patient/login');
+
+    } catch (error: any) {
+      console.error("❌ Registration failed:", error);
+      
+      // If Django registration failed but Supabase user was created, we should clean up
+      if (supabaseUserId && error.response?.status === 500) {
+        console.warn("Django registration failed but Supabase user exists. Consider cleanup.");
+        toast.error(
+          "Registration partially failed. Please contact support or try again with a different email."
+        );
+      } else {
+        const errorMessage = 
+          error.response?.data?.error || 
+          error.response?.data?.message ||
+          error.message || 
+          "An unknown error occurred.";
         
-        // Use the new patient registration endpoint
-        await axios.post('/api/register/patient/', registrationData);
-        
-        // Step C: Handle success
-        toast.success("Registration successful! You can now log in.");
-        navigate('/patient/login');
-
-      } catch (error: any) {
-        const errorMessage = error.response?.data?.[0] || error.message || "An unknown error occurred.";
         setServerError(errorMessage);
         toast.error(`Registration failed: ${errorMessage}`);
-      } finally {
-        setIsSubmitting(false);
       }
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }
+};
 
   const handleBlur = (field: keyof typeof touched) => {
     setTouched({ ...touched, [field]: true });

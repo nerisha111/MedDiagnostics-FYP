@@ -27,10 +27,11 @@ urlpatterns = [
     path('models/<uuid:pk>/', views.ModelDetailAPIView.as_view(), name='model-detail'),
     path('guidelines/', views.ClinicalGuidelineListCreateAPIView.as_view(), name='guideline-list-create'),
     path('guidelines/<uuid:pk>/', views.ClinicalGuidelineDetailAPIView.as_view(), name='guideline-detail'),
-    path('register/clinician/', views.ClinicianRegistrationAPIView.as_view(), name='clinician-register'),
-    path('register/patient/', views.PatientRegistrationAPIView.as_view(), name='patient-register'),
+    
+    # UPDATED: Use function-based views instead of class-based
+    path('register/clinician/', views.register_clinician, name='clinician-register'),
+    path('register/patient/', views.register_patient, name='patient-register'),
+    
     path('inputs/bulk-create/', views.DiagnosticInputBulkCreateAPIView.as_view(), name='input-bulk-create'),
-    path('inputs/<uuid:pk>/', views.DiagnosticInputDetailAPIView.as_view(), name='input-detail'),
-    path('inputs/', views.DiagnosticInputListCreateAPIView.as_view(), name='input-list-create'),
     path('profile/me/', views.UserProfileMeAPIView.as_view(), name='user-profile-me'),
 ]
