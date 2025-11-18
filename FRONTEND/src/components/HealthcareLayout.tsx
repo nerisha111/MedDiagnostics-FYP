@@ -41,9 +41,9 @@ export function HealthcareLayout() {
   const menuItems = [
     { id: "dashboard", icon: Home, label: "Dashboard", path: "/healthcare/dashboard" },
     { id: "upload", icon: Upload, label: "Upload Data", path: "/healthcare/upload" },
-    { id: "patients", icon: Users, label: "Patient Management", path: "/healthcare/compare" },
+    //{ id: "patients", icon: Users, label: "Patient Management", path: "/healthcare/compare" },
     { id: "reports", icon: FileText, label: "Diagnostic Reports", path: "/healthcare/history" },
-    { id: "guidelines", icon: BookOpen, label: "Clinical Guidelines", path: "/healthcare/guidelines" },
+    //{ id: "guidelines", icon: BookOpen, label: "Clinical Guidelines", path: "/healthcare/guidelines" },
     { id: "feedback", icon: MessageSquare, label: "Feedback System", path: "/healthcare/feedback" },
     { id: "settings", icon: Settings, label: "Settings", path: "/healthcare/settings" },
   ];

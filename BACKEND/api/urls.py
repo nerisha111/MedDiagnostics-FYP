@@ -48,5 +48,7 @@ urlpatterns = [
     path('feedback/stats/', FeedbackStatsAPIView.as_view(), name='feedback-stats'),
     path('diagnoses/with-feedback/', DiagnosisFeedbackListAPIView.as_view(), name='diagnosis-feedback-list'),
     path('diagnoses/<uuid:pk>/', DiagnosisDetailAPIView.as_view(), name='diagnosis-detail'),
-
+    path('cases/', views.CaseComparisonListAPIView.as_view(), name='case-comparison-list'),
+    path('cases/details/', views.CaseComparisonDetailAPIView.as_view(), name='case-comparison-details'),
+    
 ]

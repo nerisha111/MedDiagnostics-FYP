@@ -16,6 +16,8 @@ interface ClinicianProfile {
 }
 
 interface UserProfile {
+  user_details: any;
+  role: any;
   id: string;
   email: string;
   first_name: string;

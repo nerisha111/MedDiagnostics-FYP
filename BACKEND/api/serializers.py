@@ -324,8 +324,7 @@ class DiagnosisWithFeedbackSerializer(serializers.ModelSerializer):
             'feedback_details': feedback_details_val
         }
 
-        # This print statement will show us the *absolute final* dictionary
-        # just before it is sent.
+        
         print(f"--- FINAL DICT for ID {instance.id}: {final_dict} ---")
 
         return final_dict
@@ -355,3 +354,110 @@ class DiagnosisDetailSerializer(serializers.ModelSerializer):
             'recommendations' 
             
         ]
+
+class CaseComparisonListSerializer(serializers.ModelSerializer):
+    """
+    Serializer to provide a simple list of cases for selection.
+    
+    -- VERSION 2: Now correctly provides a fallback diagnosis name. --
+    """
+    diagnosis = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Diagnosticcase
+        fields = ['id', 'diagnosis', 'date']
+
+    def get_diagnosis(self, obj):
+       
+        primary_diagnosis = obj.diagnoses.first()
+       
+        return primary_diagnosis.name if primary_diagnosis and primary_diagnosis.name else (obj.description or "Untitled Case")
+
+    def get_date(self, obj):
+        primary_diagnosis = obj.diagnoses.first()
+        
+        return primary_diagnosis.diagnosis_date if primary_diagnosis else obj.created_at.date()
+
+
+class CaseComparisonDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer to provide the full, detailed structure of a case.
+    
+    -- VERSION 4: Handles inconsistent confidence scores and provides better fallbacks. --
+    """
+    date = serializers.SerializerMethodField()
+    diagnosis = serializers.SerializerMethodField()
+    confidence = serializers.SerializerMethodField()
+    age = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    symptoms = serializers.SerializerMethodField()
+    testResults = serializers.SerializerMethodField()
+    treatment = serializers.SerializerMethodField()
+    outcome = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Diagnosticcase
+        fields = [
+            'id', 'date', 'diagnosis', 'confidence', 'age', 'gender',
+            'symptoms', 'testResults', 'treatment', 'outcome'
+        ]
+
+    def get_primary_diagnosis(self, obj):
+        
+        return obj.diagnoses.order_by('-diagnosis_date').first()
+
+    def get_date(self, obj):
+        diag = self.get_primary_diagnosis(obj)
+        return diag.diagnosis_date.strftime("%B %d, %Y") if diag else obj.created_at.strftime("%B %d, %Y")
+
+    def get_diagnosis(self, obj):
+        diag = self.get_primary_diagnosis(obj)
+        
+        return diag.name if diag and diag.name else (obj.description or "N/A")
+
+    def get_confidence(self, obj):
+        diag = self.get_primary_diagnosis(obj)
+        if not (diag and diag.confidence is not None):
+            return 0
+        
+        
+        confidence_val = diag.confidence
+        if confidence_val > 1:
+            
+            return int(confidence_val)
+        else:
+           
+            return int(confidence_val * 100)
+
+    def get_age(self, obj):
+        
+        return obj.profile_info.get('age', 'N/A') if obj.profile_info else 'N/A'
+
+    def get_gender(self, obj):
+        return obj.profile_info.get('gender', 'N/A') if obj.profile_info else 'N/A'
+
+    def get_symptoms(self, obj):
+        return obj.profile_info.get('symptoms', []) if obj.profile_info else []
+
+    def get_testResults(self, obj):
+        return obj.profile_info.get('testResults', []) if obj.profile_info else []
+
+    def get_outcome(self, obj):
+        return obj.profile_info.get('outcome', '') if obj.profile_info else ''
+
+    def get_treatment(self, obj):
+        diag = self.get_primary_diagnosis(obj)
+        if not diag:
+            return []
+        
+        
+        recommendations = list(diag.recommendations.values_list('name', flat=True))
+        
+    
+        filtered_recs = [
+            rec for rec in recommendations 
+            if rec and rec.strip().upper() != 'NOT NULL'
+        ]
+        
+        return filtered_recs

@@ -1,5 +1,6 @@
 # api/views.py
 
+import uuid
 from rest_framework import generics
 from rest_framework import status
 from django.utils import timezone
@@ -22,7 +23,7 @@ from .models import (
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer, ModelSerializer,
     ClinicalGuidelineSerializer, DiagnosticCaseSerializer, DiagnosticInputSerializer,
-    DiagnosisSerializer, RecommendationSerializer, FeedbackSerializer, FeedbackCreateSerializer, DiagnosisWithFeedbackSerializer,DiagnosisDetailSerializer
+    DiagnosisSerializer, RecommendationSerializer, FeedbackSerializer, FeedbackCreateSerializer, DiagnosisWithFeedbackSerializer,DiagnosisDetailSerializer, CaseComparisonListSerializer, CaseComparisonDetailSerializer
 
 )
 from .permissions import IsOwner
@@ -775,3 +776,53 @@ class DiagnosisDetailAPIView(generics.RetrieveAPIView):
     queryset = Diagnosis.objects.all()
     serializer_class = DiagnosisDetailSerializer
     permission_classes = [IsAuthenticated]
+
+class CaseComparisonListAPIView(generics.ListAPIView):
+    """
+    Provides a simplified list of all diagnostic cases for selection
+    in the comparison tool.
+    """
+    queryset = Diagnosticcase.objects.prefetch_related('diagnoses').all()
+    serializer_class = CaseComparisonListSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class CaseComparisonDetailAPIView(APIView):
+    """
+    Provides detailed data for a list of specified case IDs.
+    Accepts a comma-separated list of IDs in a query parameter, e.g.,
+    /api/cases/details/?ids=<uuid1>,<uuid2>
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        case_ids_str = request.query_params.get('ids', '')
+        if not case_ids_str:
+            return Response(
+                {"error": "Please provide one or more case IDs in the 'ids' query parameter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            
+            case_ids = [uuid.UUID(id_str.strip()) for id_str in case_ids_str.split(',') if id_str.strip()]
+        except ValueError:
+            return Response(
+                {"error": "Invalid UUID format provided in the 'ids' parameter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        queryset = Diagnosticcase.objects.filter(id__in=case_ids).prefetch_related(
+            'diagnoses__recommendations'
+        )
+
+        if not queryset.exists():
+            return Response({}, status=status.HTTP_200_OK)
+
+        serializer = CaseComparisonDetailSerializer(queryset, many=True)
+
+        
+        response_data = {str(case['id']): case for case in serializer.data}
+
+        return Response(response_data, status=status.HTTP_200_OK)
+        

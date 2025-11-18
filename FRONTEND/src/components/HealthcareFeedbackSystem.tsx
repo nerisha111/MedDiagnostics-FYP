@@ -13,7 +13,7 @@ import { supabase } from '../supabaseClient';
 
 // A simple interface for a recommendation object from the API
 interface Recommendation {
-  recommended_text: string;
+  name: string;
 }
 
 // For the "View Details" modal on a PENDING item, now includes recommendations
@@ -234,15 +234,15 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
                       <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
                       <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
                         {(selectedDiagnosis.recommendations
-                          .filter(r => r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
+                          .filter(r => r.name.toLowerCase().includes('test'))
+                          .filter(r => r.name && r.name.trim() !== '' && !r.name.includes('NOT NULL'))
                           .length > 0) ? (
                           selectedDiagnosis.recommendations
-                            .filter(r => r.recommended_text.toLowerCase().includes('test'))
-                            .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
+                            .filter(r => r.name.toLowerCase().includes('test'))
+                            .filter(r => r.name && r.name.trim() !== '' && !r.name.includes('NOT NULL'))
                             .map((test, index) => (
                               <Badge key={index} variant="secondary" className="text-sm">
-                                <FlaskConical className="w-3 h-3 mr-1.5" />{test.recommended_text}
+                                <FlaskConical className="w-3 h-3 mr-1.5" />{test.name}
                               </Badge>
                             ))
                         ) : (
@@ -256,15 +256,15 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
                       <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
                       <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
                         {(selectedDiagnosis.recommendations
-                          .filter(r => !r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
+                          .filter(r => !r.name.toLowerCase().includes('test'))
+                          .filter(r => r.name && r.name.trim() !== '' && !r.name.includes('NOT NULL'))
                           .length > 0) ? (
                           selectedDiagnosis.recommendations
-                            .filter(r => !r.recommended_text.toLowerCase().includes('test'))
-                            .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
+                            .filter(r => !r.name.toLowerCase().includes('test'))
+                            .filter(r => r.name && r.name.trim() !== '' && !r.name.includes('NOT NULL'))
                             .map((treatment, index) => (
                               <Badge key={index} variant="outline" className="text-sm">
-                                <Pill className="w-3 h-3 mr-1.5" />{treatment.recommended_text}
+                                <Pill className="w-3 h-3 mr-1.5" />{treatment.name}
                               </Badge>
                             ))
                         ) : (

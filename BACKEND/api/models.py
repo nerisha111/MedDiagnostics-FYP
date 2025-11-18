@@ -287,7 +287,7 @@ class Recommendation(models.Model):
         related_name='recommendations'
     )
     #guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True)
-    recommended_text = models.TextField(blank=True, null=True)
+    name = models.TextField(blank=True, null=True)
     generated_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     is_reviewed = models.BooleanField(default=False, blank=True, null=True)
 
