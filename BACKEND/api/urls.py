@@ -2,6 +2,14 @@
 
 from django.urls import path
 from . import views
+from .views import (
+    FeedbackSubmitAPIView,
+    FeedbackDetailAPIView,
+    FeedbackListAPIView,
+    FeedbackStatsAPIView,
+    DiagnosisFeedbackListAPIView,
+    DiagnosisDetailAPIView
+)
 
 urlpatterns = [
     
@@ -28,10 +36,17 @@ urlpatterns = [
     path('guidelines/', views.ClinicalGuidelineListCreateAPIView.as_view(), name='guideline-list-create'),
     path('guidelines/<uuid:pk>/', views.ClinicalGuidelineDetailAPIView.as_view(), name='guideline-detail'),
     
-    # UPDATED: Use function-based views instead of class-based
+    
     path('register/clinician/', views.register_clinician, name='clinician-register'),
     path('register/patient/', views.register_patient, name='patient-register'),
     
     path('inputs/bulk-create/', views.DiagnosticInputBulkCreateAPIView.as_view(), name='input-bulk-create'),
     path('profile/me/', views.UserProfileMeAPIView.as_view(), name='user-profile-me'),
+    path('feedback/submit/', FeedbackSubmitAPIView.as_view(), name='feedback-submit'),
+    path('feedback/<uuid:diagnosis_id>/', FeedbackDetailAPIView.as_view(), name='feedback-detail'),
+    path('feedback/', FeedbackListAPIView.as_view(), name='feedback-list'),
+    path('feedback/stats/', FeedbackStatsAPIView.as_view(), name='feedback-stats'),
+    path('diagnoses/with-feedback/', DiagnosisFeedbackListAPIView.as_view(), name='diagnosis-feedback-list'),
+    path('diagnoses/<uuid:pk>/', DiagnosisDetailAPIView.as_view(), name='diagnosis-detail'),
+
 ]

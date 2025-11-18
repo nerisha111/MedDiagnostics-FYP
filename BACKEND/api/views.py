@@ -2,6 +2,7 @@
 
 from rest_framework import generics
 from rest_framework import status
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,12 +17,13 @@ logger = logging.getLogger(__name__)
 
 from .models import (
     User, Patient, Clinician, Model, Clinicalguideline,
-    Diagnosticcase, Diagnosticinput, Diagnosis, Recommendation
+    Diagnosticcase, Diagnosticinput, Diagnosis, Recommendation, Feedback
 )
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer, ModelSerializer,
     ClinicalGuidelineSerializer, DiagnosticCaseSerializer, DiagnosticInputSerializer,
-    DiagnosisSerializer, RecommendationSerializer,
+    DiagnosisSerializer, RecommendationSerializer, FeedbackSerializer, FeedbackCreateSerializer, DiagnosisWithFeedbackSerializer,DiagnosisDetailSerializer
+
 )
 from .permissions import IsOwner
 
@@ -416,10 +418,10 @@ class DiagnosticCaseListCreateAPIView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Diagnosticcase.objects.filter(created_by=self.request.user)
+        return Diagnosticcase.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(user=self.request.user)
 
 
 class DiagnosticCaseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -508,3 +510,268 @@ class ClinicalGuidelineListCreateAPIView(generics.ListCreateAPIView):
 class ClinicalGuidelineDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clinicalguideline.objects.all()
     serializer_class = ClinicalGuidelineSerializer
+
+# ==============================================================================
+# FEEDBACK
+# ==============================================================================
+class FeedbackSubmitAPIView(APIView):
+    """
+    API view for submitting feedback on a diagnosis.
+    This will:
+    1. Create a Feedback record
+    2. Update the Diagnosis table's is_reviewed and clinician_comment fields
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            diagnosis_id = request.data.get('diagnosis')
+            
+            if not diagnosis_id:
+                return Response(
+                    {'error': 'diagnosis field is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if diagnosis exists
+            try:
+                diagnosis = Diagnosis.objects.get(id=diagnosis_id)
+            except Diagnosis.DoesNotExist:
+                return Response(
+                    {'error': f'Diagnosis with id {diagnosis_id} does not exist'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check if feedback already exists for this diagnosis
+            if Feedback.objects.filter(diagnosis=diagnosis).exists():
+                return Response(
+                    {'error': 'Feedback already exists for this diagnosis. Use PUT to update.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create feedback
+            serializer = FeedbackCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                with transaction.atomic():
+                    # Save feedback with current user as clinician
+                    feedback = serializer.save(clinician=request.user)
+                    
+                    # Update the Diagnosis table
+                    diagnosis.is_reviewed = True
+                    diagnosis.date_reviewed = timezone.now().date()
+                    
+                    # Update clinician_comment with general_comments if provided
+                    if request.data.get('general_comments'):
+                        diagnosis.clinician_comment = request.data.get('general_comments')
+                    
+                    diagnosis.save()
+                    
+                    logger.info(f"Feedback submitted for diagnosis {diagnosis_id} by {request.user.email}")
+                
+                # Return the complete feedback object
+                response_serializer = FeedbackSerializer(feedback)
+                return Response(
+                    {
+                        'message': 'Feedback submitted successfully',
+                        'feedback': response_serializer.data
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error submitting feedback: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class FeedbackDetailAPIView(APIView):
+    """
+    Retrieve, update, or delete feedback for a specific diagnosis.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, diagnosis_id, *args, **kwargs):
+        """Get feedback for a specific diagnosis"""
+        try:
+            feedback = Feedback.objects.get(diagnosis_id=diagnosis_id)
+            serializer = FeedbackSerializer(feedback)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Feedback.DoesNotExist:
+            return Response(
+                {'error': 'Feedback not found for this diagnosis'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def put(self, request, diagnosis_id, *args, **kwargs):
+        """Update existing feedback"""
+        try:
+            feedback = Feedback.objects.get(diagnosis_id=diagnosis_id)
+            
+            # Check if the current user is the one who submitted the feedback
+            if feedback.clinician != request.user:
+                return Response(
+                    {'error': 'You can only update your own feedback'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            serializer = FeedbackCreateSerializer(feedback, data=request.data, partial=True)
+            if serializer.is_valid():
+                with transaction.atomic():
+                    updated_feedback = serializer.save()
+                    
+                    # Update diagnosis if general_comments changed
+                    if 'general_comments' in request.data:
+                        diagnosis = Diagnosis.objects.get(id=diagnosis_id)
+                        diagnosis.clinician_comment = request.data['general_comments']
+                        diagnosis.save()
+                    
+                    logger.info(f"Feedback updated for diagnosis {diagnosis_id} by {request.user.email}")
+                
+                response_serializer = FeedbackSerializer(updated_feedback)
+                return Response(
+                    {
+                        'message': 'Feedback updated successfully',
+                        'feedback': response_serializer.data
+                    },
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Feedback.DoesNotExist:
+            return Response(
+                {'error': 'Feedback not found for this diagnosis'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating feedback: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def delete(self, request, diagnosis_id, *args, **kwargs):
+        """Delete feedback"""
+        try:
+            feedback = Feedback.objects.get(diagnosis_id=diagnosis_id)
+            
+            # Check if the current user is the one who submitted the feedback
+            if feedback.clinician != request.user:
+                return Response(
+                    {'error': 'You can only delete your own feedback'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            with transaction.atomic():
+                # Update diagnosis before deleting feedback
+                diagnosis = Diagnosis.objects.get(id=diagnosis_id)
+                diagnosis.is_reviewed = False
+                diagnosis.clinician_comment = None
+                diagnosis.date_reviewed = None
+                diagnosis.save()
+                
+                feedback.delete()
+                logger.info(f"Feedback deleted for diagnosis {diagnosis_id} by {request.user.email}")
+            
+            return Response(
+                {'message': 'Feedback deleted successfully'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+                
+        except Feedback.DoesNotExist:
+            return Response(
+                {'error': 'Feedback not found for this diagnosis'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting feedback: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class FeedbackListAPIView(generics.ListAPIView):
+    """
+    List all feedback submitted by the authenticated clinician.
+    """
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Feedback.objects.filter(clinician=self.request.user)
+
+
+class FeedbackStatsAPIView(APIView):
+    """
+    Get feedback statistics for the authenticated clinician.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            feedback_queryset = Feedback.objects.filter(clinician=request.user)
+            
+            total_feedback = feedback_queryset.count()
+            
+            if total_feedback == 0:
+                return Response({
+                    'total_feedback': 0,
+                    'message': 'No feedback submitted yet'
+                }, status=status.HTTP_200_OK)
+            
+            # Calculate statistics
+            from django.db.models import Avg, Count
+            
+            stats = {
+                'total_feedback': total_feedback,
+                'average_accuracy_stars': feedback_queryset.aggregate(
+                    avg=Avg('accuracy_stars')
+                )['avg'],
+                'average_next_steps_rating': feedback_queryset.aggregate(
+                    avg=Avg('next_steps_rating')
+                )['avg'],
+                'accuracy_distribution': feedback_queryset.values('accuracy_correctness').annotate(
+                    count=Count('id')
+                ),
+                'confidence_assessment_distribution': feedback_queryset.values('confidence_score_assessment').annotate(
+                    count=Count('id')
+                ),
+                'data_quality_distribution': feedback_queryset.values('data_quality').annotate(
+                    count=Count('id')
+                ),
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching feedback stats: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+class DiagnosisFeedbackListAPIView(generics.ListAPIView):
+    """
+    Lists all diagnoses for the authenticated clinician,
+    annotated with their feedback status.
+    """
+    serializer_class = DiagnosisWithFeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Diagnosis.objects.filter(
+            diagnostic_case__user=self.request.user
+        ).prefetch_related('feedback').order_by('-diagnosis_date')
+    
+class DiagnosisDetailAPIView(generics.RetrieveAPIView):
+    """
+    Retrieves the full details of a single diagnosis.
+    """
+    queryset = Diagnosis.objects.all()
+    serializer_class = DiagnosisDetailSerializer
+    permission_classes = [IsAuthenticated]

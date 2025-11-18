@@ -12,15 +12,23 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Checkbox } from "./ui/checkbox";
-import { Star, CheckCircle2 } from "lucide-react";
+import { Star, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from '../supabaseClient.ts'; 
 
 interface FeedbackModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  diagnosisId: string;
+  onFeedbackSubmitted?: () => void;
 }
 
-export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
+export function FeedbackModal({ 
+  open, 
+  onOpenChange, 
+  diagnosisId,
+  onFeedbackSubmitted 
+}: FeedbackModalProps) {
   const [accuracyStars, setAccuracyStars] = useState(0);
   const [accuracyCorrectness, setAccuracyCorrectness] = useState("");
   const [actualDiagnosis, setActualDiagnosis] = useState("");
@@ -32,6 +40,8 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
   const [dataQuality, setDataQuality] = useState("");
   const [dataQualityIssues, setDataQualityIssues] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const recommendations = [
     "Further testing",
@@ -41,27 +51,104 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
     "Monitoring plan",
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setAccuracyStars(0);
+    setAccuracyCorrectness("");
+    setActualDiagnosis("");
+    setConfidenceScore("");
+    setNextStepsRating(0);
+    setFollowedRecommendations([]);
+    setMissingInfo("");
+    setGeneralComments("");
+    setDataQuality("");
+    setDataQualityIssues("");
+    setError("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    toast.success("Feedback submitted successfully");
-    setTimeout(() => {
-      onOpenChange(false);
-      // Reset form
+    setIsSubmitting(true);
+    setError("");
+
+    // Validation
+    if (accuracyCorrectness === "incorrect" && !actualDiagnosis.trim()) {
+      setError("Please provide the actual diagnosis when marking as incorrect");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (dataQuality === "no" && !dataQualityIssues.trim()) {
+      setError("Please describe the data quality issues");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error("Authentication token not found. Please log in again.");
+      }
+
+      const token = session.access_token;
+
+      const feedbackData = {
+        diagnosis: diagnosisId,
+        accuracy_stars: accuracyStars || null,
+        accuracy_correctness: accuracyCorrectness || null,
+        actual_diagnosis: actualDiagnosis || null,
+        confidence_score_assessment: confidenceScore || null,
+        next_steps_rating: nextStepsRating || null,
+        followed_recommendations: followedRecommendations.length > 0 ? followedRecommendations : null,
+        missing_info: missingInfo || null,
+        general_comments: generalComments || null,
+        data_quality: dataQuality || null,
+        data_quality_issues: dataQualityIssues || null,
+      };
+
+      //debugging purposes
+      const apiUrl = `${import.meta.env.VITE_API_URL}/api/feedback/submit/`;
+      console.log("Submitting feedback to URL:", apiUrl); 
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        
+        body: JSON.stringify(feedbackData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit feedback");
+      }
+
+      setSubmitted(true);
+      toast.success("Feedback submitted successfully");
+      
+      if (onFeedbackSubmitted) {
+        onFeedbackSubmitted();
+      }
+
       setTimeout(() => {
-        setSubmitted(false);
-        setAccuracyStars(0);
-        setAccuracyCorrectness("");
-        setActualDiagnosis("");
-        setConfidenceScore("");
-        setNextStepsRating(0);
-        setFollowedRecommendations([]);
-        setMissingInfo("");
-        setGeneralComments("");
-        setDataQuality("");
-        setDataQualityIssues("");
-      }, 300);
-    }, 1500);
+        onOpenChange(false);
+        setTimeout(() => {
+          setSubmitted(false);
+          resetForm();
+        }, 300);
+      }, 1500);
+
+    } catch (err: any) {
+      console.error("Error submitting feedback:", err);
+      setError(err.message || "Failed to submit feedback. Please try again.");
+      toast.error(err.message || "Failed to submit feedback");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const StarRating = ({
@@ -78,6 +165,7 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
           type="button"
           onClick={() => onChange(star)}
           className="transition-colors"
+          disabled={isSubmitting}
         >
           <Star
             className={`w-8 h-8 ${
@@ -103,6 +191,13 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
               </DialogDescription>
             </DialogHeader>
 
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               {/* Diagnostic Accuracy */}
               <div className="space-y-3">
@@ -110,19 +205,19 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                 <StarRating value={accuracyStars} onChange={setAccuracyStars} />
                 <RadioGroup value={accuracyCorrectness} onValueChange={setAccuracyCorrectness}>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="correct" id="correct" />
+                    <RadioGroupItem value="correct" id="correct" disabled={isSubmitting} />
                     <Label htmlFor="correct" className="cursor-pointer">
                       Correct
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="partial" id="partial" />
+                    <RadioGroupItem value="partial" id="partial" disabled={isSubmitting} />
                     <Label htmlFor="partial" className="cursor-pointer">
                       Partially Correct
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="incorrect" id="incorrect" />
+                    <RadioGroupItem value="incorrect" id="incorrect" disabled={isSubmitting} />
                     <Label htmlFor="incorrect" className="cursor-pointer">
                       Incorrect
                     </Label>
@@ -130,13 +225,17 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                 </RadioGroup>
                 {accuracyCorrectness === "incorrect" && (
                   <div className="mt-3">
-                    <Label htmlFor="actualDiagnosis">What was the actual diagnosis?</Label>
+                    <Label htmlFor="actualDiagnosis">
+                      What was the actual diagnosis? <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="actualDiagnosis"
                       value={actualDiagnosis}
                       onChange={(e) => setActualDiagnosis(e.target.value)}
                       placeholder="Enter the correct diagnosis"
                       className="mt-2"
+                      disabled={isSubmitting}
+                      required
                     />
                   </div>
                 )}
@@ -147,19 +246,19 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                 <Label className="text-base">Was the confidence score appropriate?</Label>
                 <RadioGroup value={confidenceScore} onValueChange={setConfidenceScore}>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="too-low" id="too-low" />
+                    <RadioGroupItem value="too-low" id="too-low" disabled={isSubmitting} />
                     <Label htmlFor="too-low" className="cursor-pointer">
                       Too Low
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="appropriate" id="appropriate" />
+                    <RadioGroupItem value="appropriate" id="appropriate" disabled={isSubmitting} />
                     <Label htmlFor="appropriate" className="cursor-pointer">
                       Appropriate
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="too-high" id="too-high" />
+                    <RadioGroupItem value="too-high" id="too-high" disabled={isSubmitting} />
                     <Label htmlFor="too-high" className="cursor-pointer">
                       Too High
                     </Label>
@@ -190,6 +289,7 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                               );
                             }
                           }}
+                          disabled={isSubmitting}
                         />
                         <Label htmlFor={rec} className="cursor-pointer">
                           {rec}
@@ -211,6 +311,7 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                   onChange={(e) => setMissingInfo(e.target.value)}
                   placeholder="Describe any important information that was not considered..."
                   rows={3}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -225,6 +326,8 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                   onChange={(e) => setGeneralComments(e.target.value)}
                   placeholder="Share any additional feedback..."
                   rows={3}
+                  maxLength={500}
+                  disabled={isSubmitting}
                 />
                 <p className="text-xs text-muted-foreground text-right">
                   {generalComments.length}/500
@@ -238,13 +341,13 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                 </Label>
                 <RadioGroup value={dataQuality} onValueChange={setDataQuality}>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="quality-yes" />
+                    <RadioGroupItem value="yes" id="quality-yes" disabled={isSubmitting} />
                     <Label htmlFor="quality-yes" className="cursor-pointer">
                       Yes
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="quality-no" />
+                    <RadioGroupItem value="no" id="quality-no" disabled={isSubmitting} />
                     <Label htmlFor="quality-no" className="cursor-pointer">
                       No
                     </Label>
@@ -252,7 +355,9 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                 </RadioGroup>
                 {dataQuality === "no" && (
                   <div className="mt-3">
-                    <Label htmlFor="qualityIssues">What could be improved?</Label>
+                    <Label htmlFor="qualityIssues">
+                      What could be improved? <span className="text-red-500">*</span>
+                    </Label>
                     <Textarea
                       id="qualityIssues"
                       value={dataQualityIssues}
@@ -260,6 +365,8 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                       placeholder="Describe data quality issues..."
                       rows={2}
                       className="mt-2"
+                      disabled={isSubmitting}
+                      required
                     />
                   </div>
                 )}
@@ -272,11 +379,16 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   className="flex-1"
+                  disabled={isSubmitting}
                 >
                   Skip for Now
                 </Button>
-                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                  Submit Feedback
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-primary hover:bg-primary/90"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Feedback"}
                 </Button>
               </div>
             </form>

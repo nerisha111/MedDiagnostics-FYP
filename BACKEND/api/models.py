@@ -118,7 +118,7 @@ class Diagnosticcase(models.Model):
     status = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-    created_by = models.ForeignKey(User, models.SET_NULL, db_column='created_by', blank=True, null=True)
+    user = models.ForeignKey(User, models.SET_NULL, db_column='user_id', blank=True, null=True)
     profile_info = models.JSONField(blank=True, null=True)
 
     class Meta:
@@ -133,7 +133,7 @@ class Diagnosticcase(models.Model):
 
 class Diagnosticinput(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    diagnostic_case = models.ForeignKey(Diagnosticcase, models.CASCADE)
+    diagnostic_case = models.ForeignKey(Diagnosticcase, on_delete=models.CASCADE, db_column='case_id')
     input_type = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     file_url = models.URLField(max_length=1024, blank=True, null=True)
@@ -151,11 +151,17 @@ class Diagnosticinput(models.Model):
 
 
 class Diagnosis(models.Model):
-    id = models.OneToOneField(Diagnosticcase, models.CASCADE, db_column='id', primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    diagnostic_case = models.ForeignKey(
+        Diagnosticcase, 
+        on_delete=models.CASCADE, 
+        related_name='diagnoses',
+        db_column='case_id' 
+    )
     model_used = models.ForeignKey(Model, models.PROTECT, blank=True, null=True)
     diagnosis_date = models.DateField(auto_now_add=True, blank=True, null=True)
-    probable_condition = models.CharField(max_length=255, blank=True, null=True)
-    confidence_score = models.FloatField(blank=True, null=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    confidence = models.FloatField(blank=True, null=True)
     clinician_comment = models.TextField(blank=True, null=True)
     is_reviewed = models.BooleanField(default=False, blank=True, null=True)
     date_reviewed = models.DateField(blank=True, null=True)
@@ -166,12 +172,121 @@ class Diagnosis(models.Model):
         db_table_comment = 'AI-generated diagnosis for a case using a specific model'
 
     def __str__(self):
-        return f"Diagnosis for Case {self.id}: {self.probable_condition}"
+        return f"Diagnosis for Case {self.id}: {self.name}"
+class Feedback(models.Model):
+    """
+    Stores detailed clinician feedback on AI-generated diagnoses.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    diagnosis = models.OneToOneField(
+        Diagnosis, 
+        on_delete=models.CASCADE, 
+        related_name='feedback'
+    )
+    clinician = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='submitted_feedback'
+    )
+    
+    # Diagnostic Accuracy
+    accuracy_stars = models.IntegerField(
+        blank=True, 
+        null=True,
+        help_text="Star rating (1-5) for diagnostic accuracy"
+    )
+    accuracy_correctness = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True,
+        choices=[
+            ('correct', 'Correct'),
+            ('partial', 'Partially Correct'),
+            ('incorrect', 'Incorrect')
+        ]
+    )
+    actual_diagnosis = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True,
+        help_text="The actual/correct diagnosis if AI was incorrect"
+    )
+    
+    # Confidence Score Assessment
+    confidence_score_assessment = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True,
+        choices=[
+            ('too-low', 'Too Low'),
+            ('appropriate', 'Appropriate'),
+            ('too-high', 'Too High')
+        ]
+    )
+    
+    # Recommended Actions
+    next_steps_rating = models.IntegerField(
+        blank=True, 
+        null=True,
+        help_text="Star rating (1-5) for recommended next steps"
+    )
+    followed_recommendations = models.JSONField(
+        blank=True, 
+        null=True,
+        help_text="JSON array of recommendations that were followed"
+    )
+    
+    # Missing Information
+    missing_info = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="Critical information that was missed by AI"
+    )
+    
+    # General Comments
+    general_comments = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="General feedback comments"
+    )
+    
+    # Data Quality
+    data_quality = models.CharField(
+        max_length=10, 
+        blank=True, 
+        null=True,
+        choices=[
+            ('yes', 'Yes'),
+            ('no', 'No')
+        ]
+    )
+    data_quality_issues = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="Description of data quality issues"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        managed = False
+        db_table = 'Feedback'
+        db_table_comment = 'Stores detailed clinician feedback on AI-generated diagnoses'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Feedback for Diagnosis {self.diagnosis_id} by {self.clinician.email}"
 
 class Recommendation(models.Model):
-    id = models.OneToOneField(Diagnosis, models.CASCADE, db_column='id', primary_key=True)
-    guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    diagnosis = models.ForeignKey(
+        Diagnosis, 
+        on_delete=models.CASCADE,
+        related_name='recommendations'
+    )
+    #guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True)
     recommended_text = models.TextField(blank=True, null=True)
     generated_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     is_reviewed = models.BooleanField(default=False, blank=True, null=True)

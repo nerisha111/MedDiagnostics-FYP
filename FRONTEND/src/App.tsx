@@ -37,20 +37,18 @@ import { ProtectedRoute } from "./ProtectedRoute";
 
 
 
-type Note = {
-  id: number;
-  title: string;
-  content: string;
-};
-
 export default function App() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-   const [notes, setNotes] = useState<Note[]>([]);
-
-function handleNoteAdded(newNote: Note) {
-  setNotes((prev) => [newNote, ...prev]);
-}
-
+  const [selectedDiagnosisId, setSelectedDiagnosisId] = useState("");
+  const handleOpenFeedback = (diagnosisId: string) => {
+    if (diagnosisId) {
+      setSelectedDiagnosisId(diagnosisId);
+      setShowFeedbackModal(true);
+    } else {
+      console.error("handleOpenFeedback called without a diagnosisId.");
+      
+    }
+  };
 
   return (
     <>
@@ -71,9 +69,15 @@ function handleNoteAdded(newNote: Note) {
           <Route element={<HealthcareLayout />}>
             <Route path="/healthcare/dashboard" element={<HealthcareProfessionalDashboard />} />
             <Route path="/healthcare/upload" element={<HealthcareDataUpload />} />
-            <Route path="/healthcare/results" element={<DiagnosticResults onFeedback={() => setShowFeedbackModal(true)} />} />
+            <Route 
+            path="/healthcare/results" 
+            element={<DiagnosticResults onFeedback={handleOpenFeedback} />} 
+            />
             <Route path="/healthcare/history" element={<ReportHistory />} />
-            <Route path="/healthcare/feedback" element={<HealthcareFeedbackSystem />} />
+            <Route 
+            path="/healthcare/feedback" 
+            element={<HealthcareFeedbackSystem onProvideFeedback={handleOpenFeedback} />} 
+            />
             <Route path="/healthcare/guidelines" element={<ClinicalGuidelines />} />
             <Route path="/healthcare/compare" element={<CaseComparison />} />
             <Route path="/healthcare/settings" element={<Settings />} />
@@ -105,7 +109,11 @@ function handleNoteAdded(newNote: Note) {
         </Routes>
       
 
-      <FeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
+      <FeedbackModal
+        open={showFeedbackModal}
+        onOpenChange={setShowFeedbackModal}
+        diagnosisId={selectedDiagnosisId} 
+      />
       <Toaster />
 
   );

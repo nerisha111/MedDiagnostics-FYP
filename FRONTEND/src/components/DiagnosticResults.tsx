@@ -26,6 +26,7 @@ interface PrimaryDiagnosis {
 interface DifferentialDiagnosis {
   name: string;
   confidence: number;
+  description?: string;
 }
 
 interface NextStep {
@@ -76,6 +77,7 @@ interface RecommendedTreatment {
 }
 
 interface AnalysisResult {
+  id?: string;
   primaryDiagnosis: PrimaryDiagnosis;
   differentialDiagnoses: DifferentialDiagnosis[];
   findings: string[];
@@ -86,6 +88,8 @@ interface AnalysisResult {
   dataSource?: string;
   error?: string;
   raw_output?: string;
+  caseId?: string;
+  caseDate?: string;
 }
 
 interface LocationState {
@@ -93,7 +97,7 @@ interface LocationState {
 }
 
 interface DiagnosticResultsProps {
-  onFeedback: () => void;
+  onFeedback: (diagnosisId: string) => void;
 }
 
 export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
@@ -180,11 +184,12 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
             <div>
               <h1 className="text-3xl font-bold">Comprehensive Diagnostic Report</h1>
               <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
-                Case ID: PT-2024-{Math.random().toString(36).substr(2, 6).toUpperCase()} • 
-                {new Date().toLocaleDateString()}
+  
+                Case ID: {analysis.caseId} • 
+                {analysis.caseDate ? new Date(analysis.caseDate).toLocaleDateString() : 'Date not available'}
                 {analysis.dataSource && (
                   <Badge variant="outline" className="ml-2">
-                    {analysis.dataSource === "Clinical Database" ? "📚 Evidence-Based" : "🤖 AI-Generated"}
+                    {analysis.dataSource === "Clinical Database" ? " Evidence-Based" : "AI-Generated"}
                   </Badge>
                 )}
               </p>
@@ -475,50 +480,84 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
               </TabsContent>
             </Tabs>
 
-            {/* Differential Diagnoses */}
-            {analysis.differentialDiagnoses && analysis.differentialDiagnoses.length > 0 && (
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Differential Diagnoses</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Alternative conditions to consider based on clinical presentation
-                </p>
-                <div className="space-y-3">
-                  {analysis.differentialDiagnoses.map((diagnosis, idx) => (
-                    <Card key={idx} className="p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{diagnosis.name}</h4>
-                        <span className={`text-sm font-semibold ${getConfidenceColor(diagnosis.confidence)}`}>
-                          {diagnosis.confidence}%
-                        </span>
-                      </div>
-                      <Progress value={diagnosis.confidence} className="h-1.5" />
-                    </Card>
-                  ))}
-                </div>
-              </Card>
-            )}
 
-            {/* Key Findings */}
-            <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-semibold">Key Clinical Findings</h3>
+
+{/* Differential Diagnoses - FIXED VERSION */}
+{analysis.differentialDiagnoses && analysis.differentialDiagnoses.length > 0 && (
+  <Card className="p-6 border-l-4 border-l-orange-500">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-orange-500/10 rounded-lg">
+          <TrendingUp className="w-5 h-5 text-orange-500" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Differential Diagnoses</h3>
+          <p className="text-xs text-muted-foreground">
+            Alternative conditions to consider based on clinical presentation
+          </p>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        {analysis.differentialDiagnoses.map((diagnosis, idx) => (
+          <Card key={idx} className="p-4 hover:bg-muted/50 transition-all border-l-2 border-l-orange-400">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm flex-1">{diagnosis.name}</h4>
+                <Badge 
+                  variant="outline" 
+                  className={`ml-2 ${getConfidenceColor(diagnosis.confidence)}`}
+                >
+                  {diagnosis.confidence}%
+                </Badge>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Significant observations from analysis
-              </p>
-              <ul className="space-y-3">
-                {analysis.findings?.map((finding, idx) => (
-                  <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                    <span className="text-sm leading-relaxed">{finding}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+              
+              <Progress 
+                value={diagnosis.confidence} 
+                className="h-2"
+              />
+              
+              {diagnosis.description && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {diagnosis.description}
+                </p>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="bg-orange-500/5 p-3 rounded-lg border border-orange-500/10">
+        <p className="text-xs text-muted-foreground">
+          <Info className="w-3 h-3 inline mr-1" />
+          These alternative diagnoses should be considered during clinical evaluation. 
+          Further testing may help differentiate between these possibilities.
+        </p>
+      </div>
+    </div>
+  </Card>
+)}
+
+{/* Key Findings Section - Place AFTER Differential Diagnoses */}
+<Card className="p-6">
+  <div className="flex items-center gap-2 mb-4">
+    <FileText className="w-5 h-5 text-primary" />
+    <h3 className="text-lg font-semibold">Key Clinical Findings</h3>
+  </div>
+  <p className="text-sm text-muted-foreground mb-4">
+    Significant observations from analysis
+  </p>
+  <ul className="space-y-3">
+    {analysis.findings?.map((finding, idx) => (
+      <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+        <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+        <span className="text-sm leading-relaxed">{finding}</span>
+      </li>
+    ))}
+  </ul>
+</Card>
           </div>
           
           {/* Sidebar */}
@@ -593,7 +632,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                 Generated by LLaVA-Med AI
               </span>
             </div>
-            <Button onClick={onFeedback}>
+            <Button onClick={() => analysis?.id && onFeedback(analysis.id)}>
               <MessageSquare className="w-4 h-4 mr-2" />
               Provide Feedback
             </Button>

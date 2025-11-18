@@ -50,7 +50,7 @@ import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
 
 
-const MEDICAL_AI_API_URL = "https://recollectedly-unnuzzled-tonita.ngrok-free.dev";
+const MEDICAL_AI_API_URL = "https://roffvw4k1z5a3n-8004.proxy.runpod.net";
 
 
 interface UploadedFile {
@@ -84,6 +84,14 @@ interface AnalysisResult {
     category: string;
     action: string;
   }>;
+  // NEW: Track which data sources were analyzed
+  dataSourcesAnalyzed?: {
+    images: number;
+    labResults: number;
+    clinicalNotes: number;
+    totalFiles: number;
+  };
+  dataSource?: string;
 }
 
 export function HealthcareDataUpload() {
@@ -114,9 +122,6 @@ export function HealthcareDataUpload() {
     { id: "genetic", label: "Genetic Data", icon: Dna, formats: "VCF, BAM, FASTQ, TXT, PDF", maxSize: "50MB" },
   ];
 
-  // ============================================================================
-  // HELPER FUNCTIONS
-  // ============================================================================
   const parseSize = (sizeStr: string): number => {
     const unit = sizeStr.slice(-2).toUpperCase();
     const value = parseFloat(sizeStr.slice(0, -2));
@@ -127,7 +132,7 @@ export function HealthcareDataUpload() {
 
   const validateFile = (file: File, category: string) => {
     const zone = uploadZones.find(z => z.id === category)!;
-    const allowedFormats = zone.formats.toLowerCase().split(', ');
+    const allowedFormats = zone.formats.toLowerCase().replace(/\s+/g, '').split(',');
     const maxSize = parseSize(zone.maxSize);
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
 
@@ -149,73 +154,67 @@ export function HealthcareDataUpload() {
     return { formatOk, sizeOk, qualityScore: Math.max(0, Math.min(100, qualityScore)) };
   };
 
-  /**
-   * Determines if a file is a medical image (for old image-only endpoint)
-   * or a document/text file (for new document/text endpoints)
-   */
+  
   const getFileAnalysisType = (file: UploadedFile, category: string): 'image' | 'document' | 'text' => {
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
     
-    // Images go to image analysis endpoint
     if (['jpg', 'jpeg', 'png', 'dicom'].includes(extension)) {
       return 'image';
     }
     
-    // Documents go to document analysis endpoint
     if (['pdf', 'doc', 'docx'].includes(extension)) {
       return 'document';
     }
     
-    // Text files and others go to text analysis endpoint
     return 'text';
   };
 
-  /**
-   * Call the appropriate AI analysis endpoint based on file type
-   */
+  // ============================================================================
+  // SINGLE FILE ANALYSIS (Original function - kept for backward compatibility)
+  // ============================================================================
   const analyzeWithAI = async (
     file: UploadedFile, 
     category: string,
-    patientContext: string
+    patientContext: string,
+    session: Session
   ): Promise<AnalysisResult> => {
     const analysisType = getFileAnalysisType(file, category);
     
     try {
       if (analysisType === 'image') {
-        // Use existing image analysis endpoint
         toast.info("Analyzing medical image with AI...");
         
         const formData = new FormData();
         formData.append('image', file.file);
         formData.append('question', patientContext);
+        formData.append('user_id', session.user.id);
         
         const response = await axios.post(
           `${MEDICAL_AI_API_URL}/analyze_image`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 60000 // 60 second timeout
+            timeout: 60000 
           }
         );
         
-        // Parse the JSON string in result field
         const resultData = JSON.parse(response.data.result);
         return resultData;
         
       } else if (analysisType === 'document') {
-        // Use new document analysis endpoint
         toast.info("Extracting and analyzing document with AI...");
         
         const formData = new FormData();
         formData.append('document', file.file);
         formData.append('patient_context', patientContext);
+        formData.append('user_id', session.user.id);
         
         const response = await axios.post(
           `${MEDICAL_AI_API_URL}/analyze_medical_document`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 90000 // 90 second timeout for OCR
+            timeout: 90000 
           }
         );
         
@@ -223,15 +222,14 @@ export function HealthcareDataUpload() {
         return resultData;
         
       } else {
-        // Use text analysis endpoint (for TXT, CSV, etc.)
         toast.info("Analyzing medical text data with AI...");
         
-        // Read file content as text
         const fileText = await file.file.text();
         
         const formData = new FormData();
         formData.append('medical_text', fileText);
         formData.append('patient_context', patientContext);
+        formData.append('user_id', session.user.id);
         
         const response = await axios.post(
           `${MEDICAL_AI_API_URL}/analyze_medical_text`,
@@ -249,12 +247,67 @@ export function HealthcareDataUpload() {
     } catch (error: any) {
       console.error(`AI ${analysisType} analysis error:`, error);
       
-      // Enhanced error handling
       let errorMessage = "AI analysis failed";
       if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       } else if (error.code === 'ECONNABORTED') {
         errorMessage = "Analysis timeout - file may be too large or complex";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  };
+
+  // ============================================================================
+  // NEW: MULTI-FILE COMBINED ANALYSIS
+  // ============================================================================
+  const analyzeMultipleFilesCombined = async (
+    allFiles: Array<{ file: File; category: string; name: string }>,
+    patientContext: string,
+    session: Session
+  ): Promise<AnalysisResult> => {
+    try {
+      toast.info(`Analyzing ${allFiles.length} files together for comprehensive diagnosis...`);
+      
+      const formData = new FormData();
+      
+      // Add all files to the form data
+      allFiles.forEach(fileData => {
+        formData.append('files', fileData.file);
+      });
+      
+      // Add patient context
+      formData.append('patient_context', patientContext);
+      formData.append('user_id', session.user.id);
+      
+      console.log(`Sending ${allFiles.length} files for combined analysis:`, 
+        allFiles.map(f => `${f.name} (${f.category})`));
+      
+      const response = await axios.post(
+        `${MEDICAL_AI_API_URL}/analyze_multiple_files`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 180000 // 3 minutes for multiple files
+        }
+      );
+      
+      const resultData = JSON.parse(response.data.result);
+      
+      toast.success(`✅ Combined analysis complete! Analyzed ${resultData.dataSourcesAnalyzed?.totalFiles || allFiles.length} files`);
+      
+      return resultData;
+      
+    } catch (error: any) {
+      console.error("Multi-file combined analysis error:", error);
+      
+      let errorMessage = "Combined AI analysis failed";
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = "Analysis timeout - please try with fewer or smaller files";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -294,7 +347,7 @@ export function HealthcareDataUpload() {
   }, [navigate]);
 
   // ============================================================================
-  // MAIN ANALYSIS HANDLER
+  // MAIN ANALYSIS HANDLER - UPDATED FOR MULTI-FILE SUPPORT
   // ============================================================================
   const handleProceedToAnalysis = async () => {
     setIsSubmitting(true);
@@ -349,58 +402,101 @@ export function HealthcareDataUpload() {
       
       toast.success("Diagnostic case and records created successfully!");
       
-      // Step 3: Find the best file for AI analysis
-      // Priority: images > documents > text files
-      const allFiles = Object.entries(files).flatMap(([category, fileArray]) => 
+      // ========================================================================
+      // STEP 3: COLLECT ALL UPLOADED FILES FOR ANALYSIS
+      // ========================================================================
+      const allFilesForAnalysis = Object.entries(files).flatMap(([category, fileArray]) => 
         fileArray
           .filter(f => f.status === 'success')
-          .map(f => ({ ...f, category }))
+          .map(f => ({
+            file: f.file,
+            category: category,
+            name: f.name
+          }))
       );
-      
-      let fileForAnalysis = allFiles.find(f => f.category === 'images');
-      if (!fileForAnalysis) {
-        fileForAnalysis = allFiles.find(f => f.category === 'labs');
-      }
-      if (!fileForAnalysis) {
-        fileForAnalysis = allFiles.find(f => f.category === 'notes');
-      }
-      if (!fileForAnalysis) {
-        fileForAnalysis = allFiles.find(f => f.category === 'genetic');
-      }
 
-      if (!fileForAnalysis) {
+      if (allFilesForAnalysis.length === 0) {
         toast.info("No files available for AI analysis.");
         navigate('/healthcare/dashboard');
         return;
       }
 
-      // Step 4: Prepare patient context for AI
+      // ========================================================================
+      // STEP 4: PREPARE PATIENT CONTEXT FOR AI
+      // ========================================================================
       const patientContext = [
         chiefComplaint && `Chief Complaint: ${chiefComplaint}`,
         medicalHistory && `Medical History: ${medicalHistory}`,
         gender && `Gender: ${gender}`,
-        dob && `Date of Birth: ${dob}`
+        dob && `Date of Birth: ${dob}`,
+        patientId && `Patient ID: ${patientId}`
       ].filter(Boolean).join('\n\n');
 
-      // Step 5: Analyze with appropriate AI endpoint
+      // ========================================================================
+      // STEP 5: DECIDE ANALYSIS STRATEGY (MULTI-FILE vs SINGLE-FILE)
+      // ========================================================================
       try {
-        const analysisType = getFileAnalysisType(fileForAnalysis, fileForAnalysis.category);
+        let aiResult: AnalysisResult;
         
-        toast.info(`Starting ${analysisType} analysis...`);
-        console.log(`Analyzing ${fileForAnalysis.name} as ${analysisType}`);
-        
-        const aiResult = await analyzeWithAI(
-          fileForAnalysis,
-          fileForAnalysis.category,
-          patientContext || "No additional context provided"
-        );
+        // *** NEW LOGIC: Use combined analysis if multiple files ***
+        if (allFilesForAnalysis.length > 1) {
+          // MULTI-FILE COMBINED ANALYSIS
+          toast.info("🔬 Performing comprehensive multi-modal analysis...", {
+            description: `Analyzing ${allFilesForAnalysis.length} files together for accurate diagnosis`
+          });
+          
+          aiResult = await analyzeMultipleFilesCombined(
+            allFilesForAnalysis,
+            patientContext || "No additional context provided",
+            session
+          );
+          
+          // Show which data sources were analyzed
+          if (aiResult.dataSourcesAnalyzed) {
+            const sources = aiResult.dataSourcesAnalyzed;
+            const sourcesList = [];
+            if (sources.images > 0) sourcesList.push(`${sources.images} image(s)`);
+            if (sources.labResults > 0) sourcesList.push(`${sources.labResults} lab result(s)`);
+            if (sources.clinicalNotes > 0) sourcesList.push(`${sources.clinicalNotes} clinical note(s)`);
+            
+            toast.success(`✅ Comprehensive analysis complete!`, {
+              description: `Analyzed: ${sourcesList.join(', ')}`
+            });
+          }
+          
+        } else {
+          // SINGLE FILE ANALYSIS (fallback to original logic)
+          const fileForAnalysis = allFilesForAnalysis[0];
+          const analysisType = getFileAnalysisType(
+            { ...fileForAnalysis, size: fileForAnalysis.file.size, progress: 100, status: 'success' as const },
+            fileForAnalysis.category
+          );
+          
+          toast.info(`Starting ${analysisType} analysis...`);
+          console.log(`Analyzing ${fileForAnalysis.name} as ${analysisType}`);
+          
+          aiResult = await analyzeWithAI(
+            { ...fileForAnalysis, size: fileForAnalysis.file.size, progress: 100, status: 'success' as const },
+            fileForAnalysis.category,
+            patientContext || "No additional context provided",
+            session
+          );
+          
+          toast.success("AI analysis complete!");
+        }
 
-        toast.success("AI analysis complete!");
-        
-        // Navigate to results page with analysis data
+        // ========================================================================
+        // STEP 6: NAVIGATE TO RESULTS
+        // ========================================================================
         navigate('/healthcare/results', { 
           state: { 
-            result: aiResult
+            result: aiResult,
+            // Pass additional context for the results page
+            metadata: {
+              filesAnalyzed: allFilesForAnalysis.length,
+              patientId: patientId,
+              analysisType: allFilesForAnalysis.length > 1 ? 'combined' : 'single'
+            }
           } 
         });
 
@@ -936,24 +1032,72 @@ export function HealthcareDataUpload() {
         </div>
       </Card>
 
-      {/* Info Card about AI Analysis */}
+      {/* Info Card about AI Analysis - UPDATED FOR MULTI-FILE */}
       {validatedFiles > 0 && !hasErrors && (
         <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-sm mb-1 text-blue-900 dark:text-blue-100">
-                AI Analysis Ready
+                {validatedFiles > 1 
+                  ? "🔬 Comprehensive Multi-Modal Analysis"
+                  : "How Your Data Will Be Analyzed"
+                }
               </h4>
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Your files will be analyzed using advanced AI. The system will automatically select 
-                the most appropriate analysis method based on file type:
-              </p>
-              <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4 list-disc">
-                <li><strong>Medical Images</strong> (JPG, PNG, DICOM): Visual analysis with LLaVA-Med</li>
-                <li><strong>Documents</strong> (PDF, DOCX): Text extraction + RAG-enhanced diagnosis</li>
-                <li><strong>Lab Results</strong> (TXT, CSV): Direct text analysis with medical knowledge base</li>
-              </ul>
+              
+              {validatedFiles > 1 ? (
+                <>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <strong>All {validatedFiles} files will be analyzed together</strong> for a comprehensive diagnosis.
+                    The AI will correlate findings across all data sources:
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4 list-disc">
+                    <li>
+                      <strong>Combined Analysis:</strong> Imaging findings + Lab results + Clinical notes
+                    </li>
+                    <li>
+                      <strong>Cross-Validation:</strong> AI correlates abnormalities across modalities
+                    </li>
+                    <li>
+                      <strong>Context-Aware:</strong> More accurate diagnosis with complete clinical picture
+                    </li>
+                    <li>
+                      <strong>Evidence-Based:</strong> Recommendations based on all available data
+                    </li>
+                  </ul>
+                  
+                  <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-xs">
+                    <strong>📊 Your Data:</strong>
+                    {Object.entries(files).map(([category, fileArray]) => {
+                      const count = fileArray.filter(f => f.status === 'success').length;
+                      if (count === 0) return null;
+                      const label = {
+                        images: 'Medical Images',
+                        labs: 'Lab Results',
+                        notes: 'Clinical Notes',
+                        genetic: 'Genetic Data'
+                      }[category] || category;
+                      return (
+                        <span key={category} className="inline-block mr-3 text-blue-800 dark:text-blue-200">
+                          • {count} {label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Your file will be analyzed using advanced AI. The system will automatically select 
+                    the most appropriate analysis method based on file type:
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4 list-disc">
+                    <li><strong>Medical Images</strong> (JPG, PNG, DICOM): Visual analysis with LLaVA-Med</li>
+                    <li><strong>Documents</strong> (PDF, DOCX): Text extraction + RAG-enhanced diagnosis</li>
+                    <li><strong>Lab Results</strong> (TXT, CSV): Direct text analysis with medical knowledge base</li>
+                  </ul>
+                </>
+              )}
             </div>
           </div>
         </Card>
