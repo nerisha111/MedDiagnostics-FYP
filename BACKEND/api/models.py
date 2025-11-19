@@ -186,12 +186,14 @@ class Feedback(models.Model):
     diagnosis = models.OneToOneField(
         Diagnosis, 
         on_delete=models.CASCADE, 
-        related_name='feedback'
+        related_name='feedback',
+        db_column='diagnosis_id'
     )
     clinician = models.ForeignKey(
         User, 
         on_delete=models.CASCADE,
-        related_name='submitted_feedback'
+        related_name='submitted_feedback',
+        db_column='clinician_id'
     )
     
     # Diagnostic Accuracy

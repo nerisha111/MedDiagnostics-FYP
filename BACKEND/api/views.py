@@ -495,13 +495,23 @@ class DiagnosisListCreateAPIView(generics.ListCreateAPIView):
         return Diagnosis.objects.filter(diagnostic_case__user=self.request.user)
 
 
-class DiagnosisDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    
-    serializer_class = DiagnosisSerializer
+class DiagnosisDetailAPIView(generics.RetrieveAPIView):
+    """
+    Retrieves the full details of a single diagnosis.
+    """
+    serializer_class = DiagnosisDetailSerializer
     permission_classes = [IsAuthenticated]
-    def get_queryset(self):
-        return Diagnosis.objects.filter(diagnostic_case__user=self.request.user)
 
+    def get_queryset(self):
+        
+        return Diagnosis.objects.filter(
+            diagnostic_case__user=self.request.user
+        ).select_related(
+            'diagnostic_case'
+        ).prefetch_related(
+            'diagnostic_case__inputs',  
+            'recommendations'
+        )
 
 
 # ==============================================================================

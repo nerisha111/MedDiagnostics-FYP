@@ -98,22 +98,33 @@ class DiagnosticCaseSummarySerializer(serializers.ModelSerializer):
         fields = ['id', 'description', 'profile_info', 'created_at']
 
     def get_description(self, obj):
-       
+        
+        print(f"DEBUG: Fetching description for Case ID: {obj.id}")
+        print(f"DEBUG: Case Description (Raw): '{obj.description}'")
+        
+    
+        if obj.description and str(obj.description).strip() and str(obj.description).upper() != 'NULL':
+            return obj.description
 
        
-        if obj.description and str(obj.description).strip():
-            return obj.description
-        
+        if obj.profile_info and isinstance(obj.profile_info, dict):
+            print(f"DEBUG: Checking profile_info: {obj.profile_info}")
+            
+            for key in ['description', 'symptoms', 'chief_complaint', 'complaint']:
+                val = obj.profile_info.get(key)
+                if val and str(val).strip():
+                     return str(val)
+
         
         if hasattr(obj, 'inputs'):
-            
             inputs = obj.inputs.all()
-            
-           
+            print(f"DEBUG: Found {len(inputs)} inputs.")
             for inp in inputs:
-                if inp.description and str(inp.description).strip():
+                print(f"DEBUG: Input Description: '{inp.description}'")
+                if inp.description and str(inp.description).strip() and str(inp.description).upper() != 'NULL':
                     return inp.description
         
+        print("DEBUG: No description found. Returning default.")
         return "No description recorded."
 
 class RecommendationSerializer(serializers.ModelSerializer):
