@@ -31,21 +31,56 @@ export function PatientAccountSettings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-
   const [fontSize, setFontSize] = useState(16);
   const [theme, setTheme] = useState("light");
  
+  // --- Load Data Effect ---
   useEffect(() => {
-    if (profile) {
-      setFirstName(profile.first_name || "");
-      setLastName(profile.last_name || "");
-      setEmail(profile.email || "");
-      setPhone(profile.patient_profile?.phone_number || "");
-      setAddress(profile.patient_profile?.address || "");
+    if (session?.user) {
+      // Helper to bypass TypeScript checks for fields that exist in API but not in Interface
+      const apiData = profile as any; 
+
+      const meta = session.user.user_metadata || {};
+      
+      // 1. NAMES
+      setFirstName(
+        apiData?.user_details?.first_name || 
+        apiData?.first_name || 
+        meta.first_name || 
+        ""
+      );
+      setLastName(
+        apiData?.user_details?.last_name || 
+        apiData?.last_name || 
+        meta.last_name || 
+        ""
+      );
+      
+      // 2. EMAIL
+      setEmail(
+        apiData?.user_details?.email || 
+        apiData?.email || 
+        session.user.email || 
+        ""
+      );
+      
+      // 3. PHONE & ADDRESS
+      // We use 'apiData' here to avoid "Property does not exist on type UserProfile" errors
+      setPhone(
+        apiData?.phone_number || 
+        apiData?.patient_profile?.phone_number || 
+        ""
+      );
+      
+      setAddress(
+        apiData?.address || 
+        apiData?.patient_profile?.address || 
+        ""
+      );
+      
       setIsLoading(false);
     }
-  }, [profile]);
-
+  }, [profile, session]);
 
   const handleSaveAccount = async () => {
     if (!session?.user) {
@@ -55,41 +90,40 @@ export function PatientAccountSettings() {
 
     setIsSaving(true);
     try {
-     
+      // Update User Table (Core Info)
       const { error: userError } = await supabase
         .from('User')
         .update({
           first_name: firstName,
           last_name: lastName,
-          email: email,
         })
         .eq('id', session.user.id);
 
       if (userError) throw userError;
 
-   
+      // Update Patient Table (Profile Info)
       const { error: patientError } = await supabase
         .from('Patient')
-        .update({
+        .upsert({
+          id: session.user.id,
           phone_number: phone,
           address: address,
-        })
-        .eq('id', session.user.id);
+        });
 
       if (patientError) throw patientError;
 
       toast.success("Account information updated successfully!");
- 
-      refreshProfile();
+      refreshProfile(); 
 
     } catch (error: any) {
-      toast.error("Failed to update profile:", error.message);
+      console.error("Save Error:", error);
+      toast.error(`Failed to update profile: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- Accessibility and Display Settings Logic ---
+  // --- Accessibility Logic ---
   useEffect(() => {
     document.documentElement.style.setProperty("--font-size", `${fontSize}px`);
   }, [fontSize]);
@@ -162,24 +196,53 @@ export function PatientAccountSettings() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                      <Input 
+                        id="firstName" 
+                        value={firstName} 
+                        onChange={(e) => setFirstName(e.target.value)} 
+                        placeholder="e.g. John"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                      <Input 
+                        id="lastName" 
+                        value={lastName} 
+                        onChange={(e) => setLastName(e.target.value)} 
+                        placeholder="e.g. Doe"
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={email} 
+                      onChange={(e) => setEmail(e.target.value)} 
+                      placeholder="john.doe@example.com"
+                      disabled
+                      className="bg-muted/50"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      value={phone} 
+                      onChange={(e) => setPhone(e.target.value)} 
+                      placeholder="+1 (555) 000-0000"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
-                    <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <Input 
+                      id="address" 
+                      value={address} 
+                      onChange={(e) => setAddress(e.target.value)} 
+                      placeholder="123 Medical Center Blvd, Suite 100"
+                    />
                   </div>
                 </div>
                 <Separator />
@@ -196,7 +259,7 @@ export function PatientAccountSettings() {
             {/* Display & Accessibility */}
             {activeSection === "display" && (
               <Card className="p-8 space-y-8">
-                <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                         <Palette className="w-6 h-6 text-primary" />
                     </div>

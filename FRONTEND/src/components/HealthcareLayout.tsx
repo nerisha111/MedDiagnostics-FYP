@@ -1,20 +1,22 @@
-import { useEffect } from "react";
+// components/HealthcareLayout.tsx
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // Import the useAuth hook
-import { supabase } from "../supabaseClient"; // Import supabase for the logout function
-import { toast } from "sonner"; // Optional: for user feedback
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../supabaseClient";
+import { toast } from "sonner";
+import { GlobalSearch } from "./GlobalSearch";
 
 import {
   Home,
   Upload,
-  Users,
   FileText,
-  BookOpen,
   MessageSquare,
   Settings,
   Search,
   ChevronDown,
   LogOut,
+  Command,
+  X,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import {
@@ -27,11 +29,11 @@ import {
 export function HealthcareLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, isLoading, session } = useAuth(); 
+  const { profile, isLoading, session } = useAuth();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
- 
   useEffect(() => {
-    
     if (!isLoading && !session) {
       toast.info("Please sign in to continue.");
       navigate('/healthcare/login');
@@ -41,37 +43,52 @@ export function HealthcareLayout() {
   const menuItems = [
     { id: "dashboard", icon: Home, label: "Dashboard", path: "/healthcare/dashboard" },
     { id: "upload", icon: Upload, label: "Upload Data", path: "/healthcare/upload" },
-    //{ id: "patients", icon: Users, label: "Patient Management", path: "/healthcare/compare" },
     { id: "reports", icon: FileText, label: "Diagnostic Reports", path: "/healthcare/history" },
-    //{ id: "guidelines", icon: BookOpen, label: "Clinical Guidelines", path: "/healthcare/guidelines" },
     { id: "feedback", icon: MessageSquare, label: "Feedback System", path: "/healthcare/feedback" },
     { id: "settings", icon: Settings, label: "Settings", path: "/healthcare/settings" },
   ];
 
-  
   useEffect(() => {
     const currentItem = menuItems.find(item => location.pathname.startsWith(item.path));
-
     if (currentItem) {
       document.title = `${currentItem.label} | MedDiagnostic Pro`;
     } else {
-      document.title = "MedDiagnostic Pro"; 
+      document.title = "MedDiagnostic Pro";
     }
-  }, [location.pathname, menuItems]); 
+  }, [location.pathname]);
 
+  // Keyboard shortcut for search (Cmd+K or Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const getInitials = (firstName?: string, lastName?: string) => {
     return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
- 
+
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast.error("Failed to sign out.");
     } else {
-   
       navigate('/healthcare/login');
     }
+  };
+
+  const handleSearchNavigate = (path: string, state?: any) => {
+    navigate(path, { state });
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
   };
 
   return (
@@ -109,7 +126,7 @@ export function HealthcareLayout() {
 
         <div className="p-4 border-t border-border">
           <button
-            onClick={handleSignOut} // Use the new sign out handler
+            onClick={handleSignOut}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <LogOut className="w-5 h-5" />
@@ -123,16 +140,49 @@ export function HealthcareLayout() {
         {/* Top Navigation Bar with Search */}
         <header className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex-1 max-w-xl">
+            <div className="flex-1 max-w-xl relative">
+              {/* Search Input */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input placeholder="Search patients, reports, guidelines..." className="pl-10" />
+                <Input
+                  placeholder="Search patients, reports, guidelines..."
+                  className="pl-10 pr-20"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchOpen(true)}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {searchQuery && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="p-1 hover:bg-accent rounded-md transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                    <Command className="w-3 h-3" />K
+                  </kbd>
+                </div>
               </div>
+
+              {/* Search Dropdown */}
+              <GlobalSearch
+                query={searchQuery}
+                setQuery={setSearchQuery}
+                onNavigate={handleSearchNavigate}
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+              />
             </div>
+            
             <div className="flex items-center gap-4 ml-6">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 px-3 py-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50" disabled={isLoading}>
+                  <button 
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50" 
+                    disabled={isLoading}
+                  >
                     {isLoading ? (
                       <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
                     ) : (
@@ -154,7 +204,6 @@ export function HealthcareLayout() {
                             Dr. {profile.user_details?.first_name} {profile.user_details?.last_name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {/* Capitalizes the first letter of the role */}
                             {profile.role?.charAt(0).toUpperCase() + profile.role?.slice(1)}
                           </p>
                         </>
@@ -166,8 +215,12 @@ export function HealthcareLayout() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => navigate("/healthcare/settings")}>Settings</DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleSignOut}>Logout</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/healthcare/settings")}>
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    Logout
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -176,11 +229,10 @@ export function HealthcareLayout() {
 
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-7xl mx-auto">
-            {/* Show a loading indicator until the session check is complete */}
             {isLoading && !profile ? (
-              <div>Loading Page...</div> 
+              <div>Loading Page...</div>
             ) : (
-              <Outlet /> // Render the actual page content
+              <Outlet />
             )}
           </div>
         </main>

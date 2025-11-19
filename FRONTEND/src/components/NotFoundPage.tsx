@@ -19,7 +19,7 @@ export function NotFoundPage() {
         style={{ 
           marginTop: '1.5rem', 
           padding: '0.75rem 1.5rem', 
-          backgroundColor: '#007bff', 
+          backgroundColor: '#1d6e53ff', 
           color: 'white', 
           textDecoration: 'none', 
           borderRadius: '5px' 

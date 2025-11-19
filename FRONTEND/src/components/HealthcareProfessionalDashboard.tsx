@@ -101,7 +101,9 @@ interface FeedbackStats {
 }
 
 interface Recommendation {
-  recommended_text: string | null;
+  name: string | null;
+  category: string | null;
+  type: string | null;
 }
 
 interface DiagnosisDetailResponse {
@@ -549,8 +551,8 @@ export function HealthcareProfessionalDashboard() {
       yPos += 5;
 
       const recsData = (detail.recommendations || [])
-        .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
-        .map((r, index) => [`${index + 1}`, r.recommended_text]);
+        .filter(r => r.name && !r.name.includes('NOT NULL'))
+        .map((r, index) => [`${index + 1}`, r.name]);
 
       if (recsData.length > 0) {
         autoTable(doc, {
@@ -944,16 +946,16 @@ export function HealthcareProfessionalDashboard() {
                     <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
                     <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
                       {(selectedDiagnosis.recommendations || [])
-                        .filter(r => r.recommended_text && r.recommended_text.toLowerCase().includes('test'))
-                        .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
+                        .filter(r => r.name && r.name.toLowerCase().includes('test'))
+                        .filter(r => r.name && !r.name.includes('NOT NULL'))
                         .length > 0 ? (
                         
                         (selectedDiagnosis.recommendations || [])
-                          .filter(r => r.recommended_text && r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
+                          .filter(r => r.name && r.name.toLowerCase().includes('test'))
+                          .filter(r => r.name && !r.name.includes('NOT NULL'))
                           .map((test, index) => (
                             <Badge key={index} variant="secondary" className="text-sm">
-                              <FlaskConical className="w-3 h-3 mr-1.5" />{test.recommended_text}
+                              <FlaskConical className="w-3 h-3 mr-1.5" />{test.name}
                             </Badge>
                           ))
                       ) : (
@@ -967,16 +969,16 @@ export function HealthcareProfessionalDashboard() {
                     <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
                     <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
                       {(selectedDiagnosis.recommendations || [])
-                        .filter(r => r.recommended_text && !r.recommended_text.toLowerCase().includes('test'))
-                        .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
+                        .filter(r => r.name && !r.name.toLowerCase().includes('test'))
+                        .filter(r => r.name && !r.name.includes('NOT NULL'))
                         .length > 0 ? (
 
                         (selectedDiagnosis.recommendations || [])
-                          .filter(r => r.recommended_text && !r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
+                          .filter(r => r.name && !r.name.toLowerCase().includes('test'))
+                          .filter(r => r.name && !r.name.includes('NOT NULL'))
                           .map((treatment, index) => (
                             <Badge key={index} variant="outline" className="text-sm">
-                              <Pill className="w-3 h-3 mr-1.5" />{treatment.recommended_text}
+                              <Pill className="w-3 h-3 mr-1.5" />{treatment.name}
                             </Badge>
                           ))
                       ) : (

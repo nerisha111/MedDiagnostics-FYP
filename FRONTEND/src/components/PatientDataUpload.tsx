@@ -17,7 +17,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-// --- INTERFACE FOR FILE STATE ---
+// === CONFIGURATION ===
+// 🔥 IMPORTANT: Use your RunPod public URL, NOT localhost!
+const MEDICAL_AI_API_URL = "https://roffvw4k1z5a3n-8004.proxy.runpod.net";
+
+// === INTERFACES ===
 interface UploadedFile {
   key: string;
   file: File;
@@ -33,7 +37,36 @@ interface UploadedFile {
   };
 }
 
-// --- CONFIGURATION FOR UPLOAD ZONES ---
+interface AnalysisResult {
+  primaryDiagnosis: {
+    name: string;
+    confidence: number;
+    description: string;
+    icd10?: string;
+  };
+  differentialDiagnoses: Array<{
+    name: string;
+    confidence: number;
+  }>;
+  findings: string[];
+  nextSteps: Array<{
+    category: string;
+    action: string;
+  }>;
+  dataSourcesAnalyzed?: {
+    images: number;
+    labResults: number;
+    clinicalNotes: number;
+    totalFiles: number;
+  };
+  patientGuidance?: {
+    urgency: string;
+    recommendedActions: string[];
+    disclaimer: string;
+  };
+}
+
+// === UPLOAD ZONES CONFIGURATION ===
 const uploadZones = [
   { id: "images", label: "Medical Images", icon: Image, formats: "jpeg,png,dicom", maxSize: "100MB" },
   { id: "notes", label: "Clinical Notes", icon: FileText, formats: "pdf,doc,txt", maxSize: "50MB" },
@@ -51,7 +84,7 @@ export function PatientDataUpload() {
     images: [], notes: [], labs: [], genetic: [],
   });
 
-  // --- VALIDATION AND HELPER FUNCTIONS ---
+  // === VALIDATION HELPERS ===
   const parseSize = (sizeStr: string): number => {
     const unit = sizeStr.slice(-2).toUpperCase();
     const value = parseFloat(sizeStr.slice(0, -2));
@@ -76,7 +109,7 @@ export function PatientDataUpload() {
     return { formatOk, sizeOk, error };
   };
 
-  // --- DYNAMIC FILE HANDLING AND UPLOAD LOGIC ---
+  // === FILE HANDLING ===
   const handleFiles = async (fileList: File[], category: string) => {
     if (!session) {
       toast.error("You must be logged in to upload files.");
@@ -85,7 +118,7 @@ export function PatientDataUpload() {
 
     const newUploads = fileList.map((file): UploadedFile => {
       const validation = validateFile(file, category);
-      const initialStatus = validation.error ? 'error' : 'validating'; // Start with validating
+      const initialStatus = validation.error ? 'error' : 'validating';
       if (validation.error) {
         toast.error(`${file.name}: ${validation.error}`);
       }
@@ -102,8 +135,9 @@ export function PatientDataUpload() {
 
     setFiles((prev) => ({ ...prev, [category]: [...prev[category], ...newUploads] }));
 
+    // Upload each valid file to Supabase
     newUploads.forEach(async (upload) => {
-      if (upload.validation.error) return; // Don't upload invalid files
+      if (upload.validation.error) return;
 
       setFiles((prev) => {
           const updatedCategory = prev[category].map((f) =>
@@ -141,32 +175,38 @@ export function PatientDataUpload() {
     });
   };
 
-  // --- DYNAMIC SUBMISSION LOGIC ---
+  // === MAIN ANALYSIS HANDLER - WORKS WITH EXISTING FASTAPI ===
   const handleProceedToAnalysis = async () => {
     setIsSubmitting(true);
+    
     try {
       if (!session || !profile) throw new Error("Authentication error. Please log in again.");
       const token = session.access_token;
       
+      // Step 1: Create diagnostic case in Django backend
       const caseData = {
         status: "Pending Analysis",
         description: `Case submitted by patient: ${profile.first_name} ${profile.last_name}`,
         profile_info: {
           patient_id: profile.id,
-          date_of_birth: profile.date_of_birth, // FIX: Accessed from the main profile object
-          gender: profile.gender,             // FIX: Accessed from the main profile object
+          date_of_birth: profile.date_of_birth,
+          gender: profile.gender,
         }
       };
+      
       const caseResponse = await axios.post('http://127.0.0.1:8000/api/cases/', caseData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const caseId = caseResponse.data.id;
       
+      // Step 2: Save all uploaded files metadata to Django
       const allFilesData = Object.entries(files).flatMap(([category, fileArray]) => 
         fileArray
           .filter(f => f.status === 'success' && f.storagePath)
           .map(f => {
-            const { data: { publicUrl } } = supabase.storage.from('medical-files').getPublicUrl(f.storagePath!);
+            const { data: { publicUrl } } = supabase.storage
+              .from('medical_records')
+              .getPublicUrl(f.storagePath!);
             return {
               diagnostic_case: caseId,
               input_type: category,
@@ -183,22 +223,197 @@ export function PatientDataUpload() {
         });
       }
       
-      toast.success("Case submitted successfully! You will be notified when analysis is complete.");
-      navigate('/patient/loading', { state: { caseId } });
+      toast.success("Case created successfully! Starting AI analysis...");
+      
+      // Step 3: Prepare files for AI analysis
+      const allFilesForAnalysis = Object.entries(files).flatMap(([category, fileArray]) => 
+        fileArray
+          .filter(f => f.status === 'success')
+          .map(f => ({
+            file: f.file,
+            category: category,
+            name: f.name
+          }))
+      );
+
+      if (allFilesForAnalysis.length === 0) {
+        toast.info("No files available for AI analysis.");
+        navigate('/patient/dashboard');
+        return;
+      }
+
+      // Step 4: Build patient context
+      const patientContext = [
+        profile.first_name && profile.last_name && `Patient: ${profile.first_name} ${profile.last_name}`,
+        profile.gender && `Gender: ${profile.gender}`,
+        profile.date_of_birth && `Date of Birth: ${profile.date_of_birth}`,
+        profile.id && `Patient ID: ${profile.id}`
+      ].filter(Boolean).join('\n\n');
+
+      // Step 5: Analyze files using your EXISTING FastAPI endpoints
+      toast.info("🔬 Analyzing your medical data with AI...", {
+        description: `Processing ${allFilesForAnalysis.length} file(s)`
+      });
+
+      const analysisResults: any[] = [];
+      
+      for (const fileData of allFilesForAnalysis) {
+        let endpoint = '';
+        let fieldName = '';
+        try {
+          const formData = new FormData();
+          const fileExtension = fileData.name.split('.').pop()?.toLowerCase() || '';
+          
+          // Determine which endpoint to use based on file type
+          
+          if (['jpg', 'jpeg', 'png', 'dicom'].includes(fileExtension)) {
+            // Use /analyze_image
+            endpoint = `${MEDICAL_AI_API_URL}/analyze_image`;
+            fieldName = 'image';
+            formData.append(fieldName, fileData.file);
+            formData.append('question', patientContext || "Analyze this medical image");
+            formData.append('user_id', session.user.id);
+            
+          } else if (['pdf', 'doc', 'docx', 'txt'].includes(fileExtension)) {
+            // Use /analyze_medical_document
+            endpoint = `${MEDICAL_AI_API_URL}/analyze_medical_document`;
+            fieldName = 'document';
+            formData.append(fieldName, fileData.file);
+            formData.append('patient_context', patientContext || "");
+            formData.append('user_id', session.user.id);
+            
+          } else {
+            console.warn(`Unsupported file type: ${fileExtension}`);
+            continue;
+          }
+          
+          toast.info(`Analyzing ${fileData.name}...`);
+          
+          console.log(`📤 Sending request to: ${endpoint}`);
+          console.log(`📄 File: ${fileData.name} (${fileExtension})`);
+          
+          const response = await axios.post(endpoint, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 120000 // 2 minutes per file
+          });
+          
+          console.log(`✅ Response received:`, response.data);
+          
+          const result = JSON.parse(response.data.result);
+          analysisResults.push({
+            fileName: fileData.name,
+            category: fileData.category,
+            result: result
+          });
+          
+          toast.success(`✅ ${fileData.name} analyzed`);
+          
+        } catch (fileError: any) {
+          console.error(`❌ Error analyzing ${fileData.name}:`, fileError);
+          console.error('Error details:', {
+            message: fileError.message,
+            response: fileError.response?.data,
+            status: fileError.response?.status,
+            endpoint: endpoint
+          });
+          toast.error(`Failed to analyze ${fileData.name}: ${fileError.message}`);
+          // Continue with other files
+        }
+      }
+      
+      if (analysisResults.length === 0) {
+        throw new Error("No files were successfully analyzed");
+      }
+      
+      // Step 6: Combine results (use the first/most confident result)
+      const primaryResult = analysisResults.reduce((best, current) => {
+        const bestConf = best.result?.primaryDiagnosis?.confidence || 0;
+        const currentConf = current.result?.primaryDiagnosis?.confidence || 0;
+        return currentConf > bestConf ? current : best;
+      });
+      
+      const combinedResult = primaryResult.result;
+      
+      // Add metadata about all analyzed files
+      combinedResult.dataSourcesAnalyzed = {
+        totalFiles: analysisResults.length,
+        images: analysisResults.filter(r => r.category === 'images').length,
+        labResults: analysisResults.filter(r => r.category === 'labs').length,
+        clinicalNotes: analysisResults.filter(r => r.category === 'notes').length,
+      };
+      
+      // Step 7: Save diagnosis to Django backend
+      const diagnosisData = {
+        diagnostic_case: caseId,
+        name: combinedResult.primaryDiagnosis.name,
+        confidence: combinedResult.primaryDiagnosis.confidence,
+        clinician_comment: combinedResult.primaryDiagnosis.description,
+        is_reviewed: false
+      };
+      
+      const diagnosisResponse = await axios.post(
+        'http://127.0.0.1:8000/api/diagnoses/',
+        diagnosisData,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      const diagnosisId = diagnosisResponse.data.id;
+      
+      // Step 8: Save recommendations
+      if (combinedResult.nextSteps && combinedResult.nextSteps.length > 0) {
+        const recommendationsData = combinedResult.nextSteps.map((step: any) => ({
+          diagnosis: diagnosisId,
+          name: step.action,
+          category: step.category,
+          type: step.category,
+          is_reviewed: false
+        }));
+        
+        await Promise.all(
+          recommendationsData.map((rec: any) =>
+            axios.post('http://127.0.0.1:8000/api/recommendations/', rec, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+          )
+        );
+      }
+      
+      toast.success("✅ Analysis complete!", {
+        description: `Analyzed ${analysisResults.length} file(s)`
+      });
+      
+      // Navigate to results
+      navigate('/patient/results', { 
+        state: { 
+          caseId: caseId,
+          result: combinedResult,
+          allResults: analysisResults,
+          metadata: {
+            filesAnalyzed: analysisResults.length,
+            analysisType: analysisResults.length > 1 ? 'multiple' : 'single'
+          }
+        } 
+      });
 
     } catch (error: any) {
-      console.error("Failed to create diagnostic case:", error);
-      toast.error(error.response?.data?.detail || "Failed to submit your case. Please try again.");
+      console.error("Analysis error:", error);
+      toast.error(error.response?.data?.detail || error.message || "Failed to complete analysis");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- UI-related handlers ---
+  // === UI HANDLERS ===
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragOver(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setDragOver(false); };
-  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setDragOver(false); handleFiles(Array.from(e.dataTransfer.files), activeTab); };
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) handleFiles(Array.from(e.target.files), activeTab); };
+  const handleDrop = (e: React.DragEvent) => { 
+    e.preventDefault(); 
+    setDragOver(false); 
+    handleFiles(Array.from(e.dataTransfer.files), activeTab); 
+  };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { 
+    if (e.target.files) handleFiles(Array.from(e.target.files), activeTab); 
+  };
   
   const removeFile = (category: string, key: string) => {
     setFiles((prev) => ({ ...prev, [category]: prev[category].filter((f) => f.key !== key) }));
@@ -314,7 +529,7 @@ export function PatientDataUpload() {
                 disabled={validatedFiles === 0 || hasErrors || isSubmitting}
               >
                 {isSubmitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</>
                 ) : (
                   <>Proceed to Analysis <ArrowRight className="w-4 h-4 ml-2" /></>
                 )}
@@ -323,6 +538,26 @@ export function PatientDataUpload() {
           </div>
         </Card>
       </footer>
+
+      {/* Info Card */}
+      {validatedFiles > 0 && !hasErrors && (
+        <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <div className="flex gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-sm mb-1 text-blue-900 dark:text-blue-100">
+                {validatedFiles > 1 ? "🔬 Comprehensive Analysis" : "AI-Powered Analysis"}
+              </h4>
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Your files will be analyzed using advanced medical AI. The system will provide preliminary insights that should be reviewed by a healthcare professional.
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 font-semibold">
+                ⚠️ This is not a substitute for professional medical advice, diagnosis, or treatment.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

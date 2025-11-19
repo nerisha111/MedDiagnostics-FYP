@@ -34,7 +34,9 @@ interface Report {
 }
 
 interface Recommendation {
-  recommended_text: string | null;
+  name: string | null;
+  type?: string;
+  category?: string;
 }
 
 interface DiagnosisDetailResponse {
@@ -337,8 +339,8 @@ export function ReportHistory() {
       yPos += 5;
 
       const recsData = (detail.recommendations || [])
-        .filter(r => r.recommended_text && !r.recommended_text.includes('NOT NULL'))
-        .map((r, index) => [`${index + 1}`, r.recommended_text]);
+        .filter(r => r.name && !r.name.includes('NOT NULL'))
+        .map((r, index) => [`${index + 1}`, r.name]);
 
       if (recsData.length > 0) {
         autoTable(doc, {
@@ -770,43 +772,83 @@ export function ReportHistory() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
                     <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
-                      {(selectedDiagnosis.recommendations
-                        .filter(r => r.recommended_text && r.recommended_text.toLowerCase().includes('test'))
-                        .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
-                        .length > 0) ? (
-                        selectedDiagnosis.recommendations
-                          .filter(r => r.recommended_text && r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
-                          .map((test, index) => (
-                            <Badge key={index} variant="secondary" className="text-sm">
-                              <FlaskConical className="w-3 h-3 mr-1.5" />{test.recommended_text}
-                            </Badge>
-                          ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
-                      )}
-                    </div>
+    {selectedDiagnosis.recommendations
+      // Filter: Check if type is 'Test' OR if the category implies a test (fallback)
+      .filter(r => {
+        const text = r.name || "";
+        const type = r.type || "";
+        const category = r.category || "";
+        return (
+          text.trim() !== "" && 
+          !text.includes("NOT NULL") &&
+          (type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging"))
+        );
+      })
+      .length > 0 ? (
+        selectedDiagnosis.recommendations
+          .filter(r => {
+             const text = r.name || "";
+             const type = r.type || "";
+             const category = r.category || "";
+             return (
+               text.trim() !== "" && 
+               !text.includes("NOT NULL") &&
+               (type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging"))
+             );
+          })
+          .map((test, index) => (
+            <Badge key={index} variant="secondary" className="text-sm">
+              <FlaskConical className="w-3 h-3 mr-1.5" />
+              {test.name}
+            </Badge>
+          ))
+    ) : (
+      <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
+    )}
+  </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
                     <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
-                      {(selectedDiagnosis.recommendations
-                        .filter(r => r.recommended_text && !r.recommended_text.toLowerCase().includes('test'))
-                        .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
-                        .length > 0) ? (
-                        selectedDiagnosis.recommendations
-                          .filter(r => r.recommended_text && !r.recommended_text.toLowerCase().includes('test'))
-                          .filter(r => r.recommended_text && r.recommended_text.trim() !== '' && !r.recommended_text.includes('NOT NULL'))
-                          .map((treatment, index) => (
-                            <Badge key={index} variant="outline" className="text-sm">
-                              <Pill className="w-3 h-3 mr-1.5" />{treatment.recommended_text}
-                            </Badge>
-                          ))
-                      ) : (
-                         <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
-                      )}
-                    </div>
+    {selectedDiagnosis.recommendations
+      // Filter: Anything that is NOT a test is a treatment
+      .filter(r => {
+        const text = r.name || "";
+        const type = r.type || "";
+        const category = r.category || "";
+        const isTest = type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging");
+        
+        return (
+          text.trim() !== "" && 
+          !text.includes("NOT NULL") && 
+          !isTest 
+        );
+      })
+      .length > 0 ? (
+        selectedDiagnosis.recommendations
+          .filter(r => {
+            const text = r.name || "";
+            const type = r.type || "";
+            const category = r.category || "";
+            const isTest = type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging");
+            
+            return (
+              text.trim() !== "" && 
+              !text.includes("NOT NULL") && 
+              !isTest 
+            );
+          })
+          .map((treatment, index) => (
+            <Badge key={index} variant="outline" className="text-sm">
+              <Pill className="w-3 h-3 mr-1.5" />
+              {treatment.name}
+            </Badge>
+          ))
+    ) : (
+      <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
+    )}
+  </div>
                   </div>
                 </div>
             )

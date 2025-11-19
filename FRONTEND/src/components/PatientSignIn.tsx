@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -153,14 +153,13 @@ export function PatientSignIn() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-                  <button 
-                    type="button" 
-                    onClick={() => navigate('/recover-password')} 
-                    className="text-xs text-primary hover:underline"
-                    disabled={isSubmitting}
+                  <Link 
+                    to="/recover-password?initial_role=patient" 
+                    className="text-sm text-teal-600 hover:underline"
                   >
                     Forgot Password?
-                  </button>
+                  </Link>
+
                 </div>
                 <div className="relative">
                   <Input

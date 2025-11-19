@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Fixed: Link imported from router
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ArrowLeft, Eye, EyeOff, Stethoscope, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Stethoscope, Loader2 } from "lucide-react"; // Fixed: Removed Link icon import
 import { toast } from "sonner";
 import { supabase } from "../supabaseClient";
 
@@ -127,9 +127,19 @@ export function HealthcareProfessionalLogin() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">
-                  Password <span className="text-destructive">*</span>
-                </Label>
+                {/* UI MATCH: Flex container for Label and Forgot Password Link */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">
+                    Password <span className="text-destructive">*</span>
+                  </Label>
+                  <Link 
+                    to="/recover-password?initial_role=healthcare" 
+                    className="text-sm text-teal-600 hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
+
                 <div className="relative">
                   <Input
                     id="password"

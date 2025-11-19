@@ -1,4 +1,4 @@
-# In api/authentication.py
+# api/authentication.py
 import jwt
 from django.conf import settings
 from rest_framework.authentication import BaseAuthentication
@@ -6,7 +6,7 @@ from rest_framework import exceptions
 from .models import User
 import logging
 
-# Get the logger
+
 logger = logging.getLogger(__name__)
 
 class SupabaseAuthentication(BaseAuthentication):
@@ -27,17 +27,17 @@ class SupabaseAuthentication(BaseAuthentication):
             token = auth_header.split(' ')[1]
         except IndexError:
             logger.error("Malformed Authorization header. Token is missing.")
-            # We don't raise an exception here, so Django proceeds as an anonymous user.
+            
             return None
 
-        # --- STEP 1: LOG THE SECRET KEY WE ARE USING ---
+        
         secret_from_settings = settings.SUPABASE_JWT_SECRET
         logger.debug(f"Using JWT Secret from settings: '{secret_from_settings}'")
         if not secret_from_settings:
             logger.error("FATAL: SUPABASE_JWT_SECRET is not set in Django settings!")
             return None
 
-        # --- STEP 2: TRY TO DECODE THE TOKEN ---
+        
         try:
             payload = jwt.decode(
                 token, 
@@ -48,9 +48,9 @@ class SupabaseAuthentication(BaseAuthentication):
             logger.debug("SUCCESS: Token decoded successfully.")
 
         except Exception as e:
-            # --- STEP 3: LOG THE EXACT ERROR ---
+           
             logger.error(f"TOKEN VALIDATION FAILED. Reason: {e}")
-            # We raise the exception here to ensure the request is denied.
+            
             raise exceptions.AuthenticationFailed(f'Invalid or expired token. Error: {e}')
 
         user_id = payload.get('sub')

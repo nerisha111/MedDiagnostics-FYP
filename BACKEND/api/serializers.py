@@ -37,7 +37,7 @@ class ClinicalGuidelineSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 # ==============================================================================
-# NESTED & DETAILED SERIALIZERS (No changes needed here)
+# NESTED & DETAILED SERIALIZERS
 # ==============================================================================
 
 class PatientSerializer(serializers.ModelSerializer):
@@ -64,7 +64,6 @@ class DiagnosticCaseSerializer(serializers.ModelSerializer):
 class DiagnosticInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = Diagnosticinput
-        # List all fields that the frontend will send
         fields = [
             'id',
             'diagnostic_case',
@@ -88,23 +87,44 @@ class DiagnosisSerializer(serializers.ModelSerializer):
        ]
 
 class DiagnosticCaseSummarySerializer(serializers.ModelSerializer):
-    """ A simple serializer to embed in the diagnosis detail view. """
+    """ 
+    A simple serializer to embed in the diagnosis detail view. 
+    Includes robust logic to fetch description from inputs.
+    """
+    description = serializers.SerializerMethodField()
+
     class Meta:
         model = Diagnosticcase
         fields = ['id', 'description', 'profile_info', 'created_at']
 
+    def get_description(self, obj):
+       
+
+       
+        if obj.description and str(obj.description).strip():
+            return obj.description
+        
+        
+        if hasattr(obj, 'inputs'):
+            
+            inputs = obj.inputs.all()
+            
+           
+            for inp in inputs:
+                if inp.description and str(inp.description).strip():
+                    return inp.description
+        
+        return "No description recorded."
+
 class RecommendationSerializer(serializers.ModelSerializer):
-    #guideline_details = ClinicalGuidelineSerializer(source='guideline_used', read_only=True)
     class Meta:
         model = Recommendation
+        
         fields = [
-            'id', 'recommended_text', 'generated_date', 'is_reviewed'
-            
+            'id', 'name', 'name', 'category', 'type', 'generated_date', 'is_reviewed'
         ]
+
 class FeedbackSerializer(serializers.ModelSerializer):
-    """
-    Serializer for clinician feedback on diagnoses.
-    """
     clinician_email = serializers.StringRelatedField(source='clinician', read_only=True)
     diagnosis_details = DiagnosisSerializer(source='diagnosis', read_only=True)
     
@@ -132,55 +152,34 @@ class FeedbackSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'clinician']
 
     def validate(self, data):
-        """
-        Validate feedback data:
-        - If accuracy_correctness is 'incorrect', actual_diagnosis should be provided
-        - If data_quality is 'no', data_quality_issues should be provided
-        """
         if data.get('accuracy_correctness') == 'incorrect' and not data.get('actual_diagnosis'):
             raise serializers.ValidationError({
                 'actual_diagnosis': 'This field is required when diagnosis is marked as incorrect.'
             })
-        
         if data.get('data_quality') == 'no' and not data.get('data_quality_issues'):
             raise serializers.ValidationError({
                 'data_quality_issues': 'Please describe the data quality issues.'
             })
-        
         return data
 
 # ==============================================================================
-# REGISTRATION SERIALIZERS (Corrected and Organized)
+# REGISTRATION SERIALIZERS
 # ==============================================================================
 
-# --- Clinician Registration ---
-
 class ClinicianNestedDataSerializer(serializers.ModelSerializer):
-    """
-    A simple nested serializer to handle the fields for the Clinician model.
-    """
     class Meta:
         model = Clinician
         fields = ['role', 'department', 'medical_license_number']
 
 class ClinicianRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for clinician registration with Supabase.
-    Creates a User and a related Clinician instance from a single API call.
-    """
     clinician_data = ClinicianNestedDataSerializer(write_only=True)
     id = serializers.UUIDField()
 
     class Meta:
         model = User
         fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'gender',
-            'date_of_birth',
-            'email',
-            'clinician_data',
+            'id', 'first_name', 'last_name', 'gender',
+            'date_of_birth', 'email', 'clinician_data',
         ]
 
     def create(self, validated_data):
@@ -190,121 +189,70 @@ class ClinicianRegistrationSerializer(serializers.ModelSerializer):
         Clinician.objects.create(id=user, **clinician_info)
         return user
 
-# --- Patient Registration ---
-
 class PatientNestedDataSerializer(serializers.ModelSerializer):
-    """
-    A simple nested serializer to handle the fields for the Patient model.
-    """
     class Meta:
         model = Patient
         fields = ['phone_number', 'address']
 
 class PatientRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for patient registration with Supabase.
-    Creates a User and a related Patient instance from a single API call.
-    """
     patient_data = PatientNestedDataSerializer(write_only=True)
     id = serializers.UUIDField()
 
     class Meta:
         model = User
         fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'gender',
-            'date_of_birth',
-            'email',
-            'patient_data',
+            'id', 'first_name', 'last_name', 'gender',
+            'date_of_birth', 'email', 'patient_data',
         ]
 
     def create(self, validated_data):
         patient_info = validated_data.pop('patient_data')
         user_id = validated_data.pop('id')
         user = User.objects.create(id=user_id, **validated_data)
-
         Patient.objects.create(id=user, **patient_info)
         return user
     
 class FeedbackCreateSerializer(serializers.ModelSerializer):
-    """
-    Simplified serializer for creating feedback (used by the frontend).
-    """
-
     class Meta:
         model = Feedback
         fields = [
-            'diagnosis',
-            'accuracy_stars',
-            'accuracy_correctness',
-            'actual_diagnosis',
-            'confidence_score_assessment',
-            'next_steps_rating',
-            'followed_recommendations',
-            'missing_info',
-            'general_comments',
-            'data_quality',
-            'data_quality_issues'
+            'diagnosis', 'accuracy_stars', 'accuracy_correctness',
+            'actual_diagnosis', 'confidence_score_assessment',
+            'next_steps_rating', 'followed_recommendations',
+            'missing_info', 'general_comments',
+            'data_quality', 'data_quality_issues'
         ]
 
     def validate(self, data):
-        """
-        Same validation as FeedbackSerializer
-        """
         if data.get('accuracy_correctness') == 'incorrect' and not data.get('actual_diagnosis'):
             raise serializers.ValidationError({
                 'actual_diagnosis': 'This field is required when diagnosis is marked as incorrect.'
             })
-        
         if data.get('data_quality') == 'no' and not data.get('data_quality_issues'):
             raise serializers.ValidationError({
                 'data_quality_issues': 'Please describe the data quality issues.'
             })
-        
         return data
     
 class DiagnosisWithFeedbackSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the Diagnosis model that includes related feedback details.
-    This version uses to_representation for maximum control over the output.
-    """
-    # We still declare the fields here so DRF's tooling can see them.
     diagnosisTitle = serializers.CharField(source='name', read_only=True)
     date = serializers.DateField(source='diagnosis_date', read_only=True)
     status = serializers.CharField(read_only=True)
     confidence = serializers.IntegerField(read_only=True)
     feedback_details = serializers.DictField(read_only=True)
 
-
     class Meta:
         model = Diagnosis
-        # The fields here must match the keys in the dictionary we return below.
         fields = [
-            'id',
-            'diagnosisTitle',
-            'date',
-            'status',
-            'confidence',
-            'feedback_details'
+            'id', 'diagnosisTitle', 'date',
+            'status', 'confidence', 'feedback_details'
         ]
 
     def to_representation(self, instance):
-        """
-        This method manually constructs the dictionary for each object.
-        It is the final step before the data is converted to JSON.
-        """
-        # Determine status
         has_feedback = hasattr(instance, 'feedback')
         status_val = "given" if has_feedback else "pending"
+        confidence_val = int(instance.confidence) if instance.confidence is not None else 0
 
-        # Determine confidence, with a fallback
-        confidence_val = 0
-        if instance.confidence is not None:
-            confidence_val = int(instance.confidence)
-
-        # Determine feedback_details
         feedback_details_val = None
         if has_feedback:
             feedback = instance.feedback
@@ -314,7 +262,6 @@ class DiagnosisWithFeedbackSerializer(serializers.ModelSerializer):
                 'comments': feedback.general_comments
             }
         
-        # Manually build the dictionary
         final_dict = {
             'id': instance.id,
             'diagnosisTitle': instance.name,
@@ -323,44 +270,26 @@ class DiagnosisWithFeedbackSerializer(serializers.ModelSerializer):
             'confidence': confidence_val,
             'feedback_details': feedback_details_val
         }
-
-        
-        print(f"--- FINAL DICT for ID {instance.id}: {final_dict} ---")
-
         return final_dict
 
-    
 class RecommendationDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recommendation
         fields = '__all__' 
 
 class DiagnosisDetailSerializer(serializers.ModelSerializer):
-    """ Serializer for a single, detailed diagnosis view. """
-    
     recommendations = RecommendationDetailSerializer(many=True, read_only=True)
     diagnostic_case = DiagnosticCaseSummarySerializer(read_only=True)
-
 
     class Meta:
         model = Diagnosis
         fields = [
-            'id',
-            'diagnostic_case',
-            'name',
-            'diagnosis_date',
-            'confidence',
-            'clinician_comment',
-            'recommendations' 
-            
+            'id', 'diagnostic_case', 'name',
+            'diagnosis_date', 'confidence',
+            'clinician_comment', 'recommendations' 
         ]
 
 class CaseComparisonListSerializer(serializers.ModelSerializer):
-    """
-    Serializer to provide a simple list of cases for selection.
-    
-    -- VERSION 2: Now correctly provides a fallback diagnosis name. --
-    """
     diagnosis = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
 
@@ -369,23 +298,15 @@ class CaseComparisonListSerializer(serializers.ModelSerializer):
         fields = ['id', 'diagnosis', 'date']
 
     def get_diagnosis(self, obj):
-       
         primary_diagnosis = obj.diagnoses.first()
-       
         return primary_diagnosis.name if primary_diagnosis and primary_diagnosis.name else (obj.description or "Untitled Case")
 
     def get_date(self, obj):
         primary_diagnosis = obj.diagnoses.first()
-        
         return primary_diagnosis.diagnosis_date if primary_diagnosis else obj.created_at.date()
 
 
 class CaseComparisonDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer to provide the full, detailed structure of a case.
-    
-    -- VERSION 4: Handles inconsistent confidence scores and provides better fallbacks. --
-    """
     date = serializers.SerializerMethodField()
     diagnosis = serializers.SerializerMethodField()
     confidence = serializers.SerializerMethodField()
@@ -404,7 +325,6 @@ class CaseComparisonDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_primary_diagnosis(self, obj):
-        
         return obj.diagnoses.order_by('-diagnosis_date').first()
 
     def get_date(self, obj):
@@ -413,25 +333,19 @@ class CaseComparisonDetailSerializer(serializers.ModelSerializer):
 
     def get_diagnosis(self, obj):
         diag = self.get_primary_diagnosis(obj)
-        
         return diag.name if diag and diag.name else (obj.description or "N/A")
 
     def get_confidence(self, obj):
         diag = self.get_primary_diagnosis(obj)
         if not (diag and diag.confidence is not None):
             return 0
-        
-        
         confidence_val = diag.confidence
         if confidence_val > 1:
-            
             return int(confidence_val)
         else:
-           
             return int(confidence_val * 100)
 
     def get_age(self, obj):
-        
         return obj.profile_info.get('age', 'N/A') if obj.profile_info else 'N/A'
 
     def get_gender(self, obj):
@@ -450,14 +364,35 @@ class CaseComparisonDetailSerializer(serializers.ModelSerializer):
         diag = self.get_primary_diagnosis(obj)
         if not diag:
             return []
-        
-        
         recommendations = list(diag.recommendations.values_list('name', flat=True))
-        
-    
         filtered_recs = [
             rec for rec in recommendations 
             if rec and rec.strip().upper() != 'NOT NULL'
         ]
-        
         return filtered_recs
+    
+# ==============================================================================
+# patient history serializers
+# ==============================================================================
+class ActivityHistorySerializer(serializers.Serializer):
+    """
+    Serializer for patient activity history.
+    """
+    id = serializers.UUIDField()
+    type = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    date = serializers.DateField()
+    time = serializers.TimeField()
+    status = serializers.CharField(required=False, allow_null=True)
+    details = serializers.CharField(required=False, allow_null=True)
+
+class ActivityStatsSerializer(serializers.Serializer):
+    """
+    Serializer for activity statistics.
+    """
+    total_activities = serializers.IntegerField()
+    uploads = serializers.IntegerField()
+    analyses = serializers.IntegerField()
+    downloads = serializers.IntegerField()
+    views = serializers.IntegerField()

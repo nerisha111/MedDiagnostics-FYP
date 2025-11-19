@@ -13,6 +13,8 @@ from django.db import transaction
 import requests
 import json
 import logging
+from datetime import datetime, timedelta
+from django.db.models import Count, Q
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +108,15 @@ def register_clinician(request):
         if User.objects.filter(email=data['email']).exists():
             logger.warning(f"User with email {data['email']} already exists")
             return Response(
-                {'error': 'Email already registered'},
+                {'error': 'This email is already registered. Please use a different email or login.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check for duplicate medical license number BEFORE creating user
+        if Clinician.objects.filter(medical_license_number=data['medical_license_number']).exists():
+            logger.warning(f"Medical license number {data['medical_license_number']} already exists")
+            return Response(
+                {'error': 'This medical license number is already registered. Each healthcare professional must have a unique license number.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -114,7 +124,7 @@ def register_clinician(request):
         with transaction.atomic():
             logger.info(f"Creating User with ID: {data['id']}")
             
-            # Create User record - try with minimal fields first
+            # Create User record with 'clinician' as the role
             try:
                 user = User.objects.create(
                     id=data['id'],
@@ -122,27 +132,29 @@ def register_clinician(request):
                     first_name=data['first_name'],
                     last_name=data['last_name'],
                     gender=data['gender'],
-                    role=data['role'],
+                    role='clinician', 
                     email=data['email'],
                     date_of_birth=data['date_of_birth'],
                 )
                 logger.info(f"✓ User created successfully: {user.id}")
             except Exception as user_error:
                 logger.error(f"✗ FAILED to create User: {type(user_error).__name__}: {str(user_error)}")
+                logger.error(f"User data that failed: {data}")
                 raise
             
-            # Create Clinician record
+            
             try:
                 logger.info(f"Creating Clinician for user: {user.id}")
                 clinician = Clinician.objects.create(
-                    id=user,  # This is a OneToOneField, so pass the user instance
-                    role=data['role'],
+                    id=user,  
+                    role=data['role'],  
                     department=data['department'],
                     medical_license_number=data['medical_license_number'],
                 )
                 logger.info(f"✓ Clinician created successfully: {clinician.id}")
             except Exception as clinician_error:
                 logger.error(f"✗ FAILED to create Clinician: {type(clinician_error).__name__}: {str(clinician_error)}")
+                logger.error(f"Clinician data that failed: role={data['role']}, dept={data['department']}, license={data['medical_license_number']}")
                 raise
             
             logger.info(f"=== REGISTRATION SUCCESS: {user.email} ===")
@@ -164,11 +176,21 @@ def register_clinician(request):
         logger.error(f"Error Message: {str(e)}")
         logger.error(f"Full Traceback:\n{error_details}")
         
+        # Provide user-friendly error messages
+        error_message = 'Database registration failed. Please contact support.'
+        
+        if 'duplicate key' in str(e).lower():
+            if 'email' in str(e).lower():
+                error_message = 'This email is already registered. Please use a different email or login.'
+            elif 'medical_license_number' in str(e).lower():
+                error_message = 'This medical license number is already registered. Each healthcare professional must have a unique license number.'
+            else:
+                error_message = 'A record with this information already exists. Please check your details.'
+        
         return Response(
-            {'error': f'Database error: {type(e).__name__}: {str(e)}'},
+            {'error': error_message},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -193,7 +215,7 @@ def register_patient(request):
         logger.info(f"Patient registration attempt for email: {data.get('email')}")
         logger.info(f"Received data: {data}")
         
-        # Validate required fields
+        
         required_fields = [
             'id', 'first_name', 'last_name', 'gender', 
             'email', 'date_of_birth', 'phone_number'
@@ -207,7 +229,7 @@ def register_patient(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if user already exists
+        
         if User.objects.filter(id=data['id']).exists():
             logger.warning(f"User with ID {data['id']} already exists")
             return Response(
@@ -215,7 +237,7 @@ def register_patient(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check for duplicate email
+        
         if User.objects.filter(email=data['email']).exists():
             logger.warning(f"User with email {data['email']} already exists")
             return Response(
@@ -223,19 +245,19 @@ def register_patient(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Use transaction to ensure both User and Patient are created together
+        
         with transaction.atomic():
             logger.info(f"Creating User with ID: {data['id']}")
             
-            # Create User record - FIXED: Added supabase_user_id
+            
             try:
                 user = User.objects.create(
                     id=data['id'],
-                    supabase_user_id=data['id'],  # ✅ FIXED: This was missing!
+                    supabase_user_id=data['id'],  
                     first_name=data['first_name'],
                     last_name=data['last_name'],
                     gender=data['gender'],
-                    role='patient',  # ✅ ADDED: Set role to 'patient'
+                    role='patient', 
                     email=data['email'],
                     date_of_birth=data['date_of_birth'],
                 )
@@ -424,10 +446,13 @@ class DiagnosticCaseListCreateAPIView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
 class DiagnosticCaseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Diagnosticcase.objects.all()
+   
     serializer_class = DiagnosticCaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Diagnosticcase.objects.filter(user=self.request.user)
 
 
 # ==============================================================================
@@ -462,13 +487,21 @@ class DiagnosticInputDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 # ==============================================================================
 
 class DiagnosisListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Diagnosis.objects.all()
+    
     serializer_class = DiagnosisSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Diagnosis.objects.filter(diagnostic_case__user=self.request.user)
 
 
 class DiagnosisDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Diagnosis.objects.all()
+    
     serializer_class = DiagnosisSerializer
+    permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        return Diagnosis.objects.filter(diagnostic_case__user=self.request.user)
+
 
 
 # ==============================================================================
@@ -782,9 +815,11 @@ class CaseComparisonListAPIView(generics.ListAPIView):
     Provides a simplified list of all diagnostic cases for selection
     in the comparison tool.
     """
-    queryset = Diagnosticcase.objects.prefetch_related('diagnoses').all()
+    
     serializer_class = CaseComparisonListSerializer
     permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        return Diagnosticcase.objects.filter(user=self.request.user).prefetch_related('diagnoses')
 
 
 class CaseComparisonDetailAPIView(APIView):
@@ -825,4 +860,350 @@ class CaseComparisonDetailAPIView(APIView):
         response_data = {str(case['id']): case for case in serializer.data}
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+class PatientReportsListAPIView(APIView):
+    """
+    Lists all diagnostic cases with their diagnoses for the authenticated patient.
+    Returns data formatted for the patient reports page.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            if not request.user or not request.user.is_authenticated:
+                return Response(
+                    {'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            
+            cases = Diagnosticcase.objects.filter(
+                user=request.user
+            ).prefetch_related(
+                'diagnoses',
+                'inputs'
+            ).order_by('-created_at')
+            
+            reports_data = []
+            
+            for case in cases:
+                # Double-check case belongs to this user (extra safety)
+                if case.user.id != request.user.id:
+                    logger.warning(f"Skipping case {case.id} - does not belong to user {request.user.id}")
+                    continue
+                
+                # Get the primary diagnosis (most recent or highest confidence)
+                primary_diagnosis = case.diagnoses.order_by('-confidence', '-diagnosis_date').first()
+                
+                if not primary_diagnosis:
+                    # Case with no diagnosis yet (still processing)
+                    reports_data.append({
+                        'id': str(case.id),
+                        'case_id': str(case.id),
+                        'type': 'Diagnostic Analysis',
+                        'diagnosis': 'Processing...',
+                        'date': case.created_at.strftime('%Y-%m-%d'),
+                        'status': 'processing',
+                        'confidence': 0,
+                        'dataSources': self._get_data_sources(case),
+                        'diagnosis_id': None
+                    })
+                else:
+                    # Determine report type based on case history FOR THIS USER
+                    case_count = Diagnosticcase.objects.filter(
+                        user=request.user,
+                        created_at__lte=case.created_at
+                    ).count()
+                    
+                    if case_count == 1:
+                        report_type = 'Initial Screening'
+                    elif case_count == 2:
+                        report_type = 'Diagnostic Analysis'
+                    else:
+                        report_type = 'Follow-up Analysis'
+                    
+                    report_status = 'complete'
+                    
+                    reports_data.append({
+                        'id': f"RPT-{case.created_at.strftime('%Y')}-{str(case.id)[:8]}",
+                        'case_id': str(case.id),
+                        'type': report_type,
+                        'diagnosis': primary_diagnosis.name or 'Diagnosis Pending',
+                        'date': primary_diagnosis.diagnosis_date.strftime('%Y-%m-%d') if primary_diagnosis.diagnosis_date else case.created_at.strftime('%Y-%m-%d'),
+                        'status': report_status,
+                        'confidence': int(primary_diagnosis.confidence) if primary_diagnosis.confidence else 0,
+                        'dataSources': self._get_data_sources(case),
+                        'diagnosis_id': str(primary_diagnosis.id),
+                        'description': primary_diagnosis.clinician_comment or '',
+                    })
+            
+            logger.info(f"Returning {len(reports_data)} reports for user {request.user.email}")
+            return Response(reports_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching patient reports: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_data_sources(self, case):
+        """Extract unique data source types from case inputs"""
+        inputs = case.inputs.all()
+        sources = set()
         
+        for input_obj in inputs:
+            input_type = input_obj.input_type
+            if input_type:
+                # Map input types to display categories
+                if input_type in ['images', 'image']:
+                    sources.add('images')
+                elif input_type in ['labs', 'lab']:
+                    sources.add('labs')
+                elif input_type in ['notes', 'note', 'clinical_notes']:
+                    sources.add('notes')
+                elif input_type in ['genetic', 'genomic']:
+                    sources.add('genetic')
+        
+        return list(sources) if sources else ['notes']
+
+
+class PatientReportDetailAPIView(APIView):
+    """
+    Get detailed information for a specific report/diagnosis.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, diagnosis_id, *args, **kwargs):
+        try:
+            # Verify user is authenticated
+            if not request.user or not request.user.is_authenticated:
+                return Response(
+                    {'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            logger.info(f"User {request.user.email} requesting diagnosis {diagnosis_id}")
+            
+            
+            diagnosis = Diagnosis.objects.select_related(
+                'diagnostic_case__user'
+            ).prefetch_related(
+                'recommendations'
+            ).get(id=diagnosis_id)
+            
+            
+            if diagnosis.diagnostic_case.user.id != request.user.id:
+                logger.warning(
+                    f"Unauthorized access attempt: User {request.user.email} (ID: {request.user.id}) "
+                    f"tried to access diagnosis {diagnosis_id} belonging to user {diagnosis.diagnostic_case.user.email} "
+                    f"(ID: {diagnosis.diagnostic_case.user.id})"
+                )
+                return Response(
+                    {'error': 'You do not have permission to view this report'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            logger.info(f"Access granted for user {request.user.email} to diagnosis {diagnosis_id}")
+            
+            # Get case inputs for data sources
+            case = diagnosis.diagnostic_case
+            inputs = case.inputs.all()
+            
+            data_sources = []
+            for input_obj in inputs:
+                if input_obj.input_type:
+                    data_sources.append(input_obj.input_type)
+            
+            # Get recommendations
+            recommendations = diagnosis.recommendations.all()
+            next_steps = []
+            
+            for rec in recommendations:
+                next_steps.append({
+                    'category': rec.category or rec.type or 'General',
+                    'action': rec.name or rec.description or 'No description'
+                })
+            
+            # Build response
+            report_detail = {
+                'id': str(diagnosis.id),
+                'case_id': str(case.id),
+                'diagnosis': diagnosis.name,
+                'confidence': int(diagnosis.confidence) if diagnosis.confidence else 0,
+                'date': diagnosis.diagnosis_date.strftime('%Y-%m-%d') if diagnosis.diagnosis_date else case.created_at.strftime('%Y-%m-%d'),
+                'description': diagnosis.clinician_comment or 'No description available',
+                'status': 'reviewed' if diagnosis.is_reviewed else 'complete',
+                'dataSources': list(set(data_sources)),
+                'findings': self._extract_findings(diagnosis.clinician_comment),
+                'nextSteps': next_steps if next_steps else [
+                    {
+                        'category': 'Follow-up',
+                        'action': 'Consult with your healthcare provider to discuss treatment options'
+                    },
+                    {
+                        'category': 'Lifestyle',
+                        'action': 'Adopt dietary changes and increase physical activity'
+                    }
+                ],
+                'profile_info': case.profile_info or {}
+            }
+            
+            return Response(report_detail, status=status.HTTP_200_OK)
+            
+        except Diagnosis.DoesNotExist:
+            logger.error(f"Diagnosis {diagnosis_id} not found")
+            return Response(
+                {'error': 'Report not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching report detail: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _extract_findings(self, description):
+        """
+        Extract key findings from description text.
+        """
+        if not description:
+            return [
+                "Detailed findings documented in comprehensive clinical assessment"
+            ]
+        
+        sentences = [s.strip() for s in description.replace('\n', '. ').split('.') if s.strip()]
+        findings = sentences[:5] if sentences else ["No specific findings documented"]
+        
+        return findings
+
+class PatientActivityHistoryAPIView(APIView):
+    """
+    Get activity history for the authenticated patient.
+    Returns a timeline of uploads, analyses, downloads, and views.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            
+            # Get all diagnostic cases for this patient
+            cases = Diagnosticcase.objects.filter(user=user).prefetch_related(
+                'inputs', 'diagnoses'
+            ).order_by('-created_at')
+            
+            activities = []
+            
+            # Process each case to extract activities
+            for case in cases:
+                # Upload activities from inputs
+                for input_obj in case.inputs.all():
+                    activities.append({
+                        'id': str(input_obj.id),
+                        'type': 'upload',
+                        'title': f'Uploaded {input_obj.input_type or "medical data"}',
+                        'description': input_obj.description or f'File: {input_obj.file_name or "Unknown"}',
+                        'date': input_obj.upload_date.date().isoformat(),
+                        'time': input_obj.upload_date.time().strftime('%I:%M %p'),
+                        'status': 'success',
+                        'details': f'{input_obj.file_size // 1024 if input_obj.file_size else 0} KB'
+                    })
+                
+                # Analysis activities from diagnoses
+                for diagnosis in case.diagnoses.all():
+                    activities.append({
+                        'id': str(diagnosis.id),
+                        'type': 'analysis',
+                        'title': 'Analysis Completed',
+                        'description': diagnosis.name or 'Diagnostic analysis completed',
+                        'date': diagnosis.diagnosis_date.isoformat() if diagnosis.diagnosis_date else case.created_at.date().isoformat(),
+                        'time': case.created_at.time().strftime('%I:%M %p'),
+                        'status': 'success',
+                        'details': f'{int(diagnosis.confidence)}% confidence' if diagnosis.confidence else None
+                    })
+                    
+                    # View activity when diagnosis was reviewed
+                    if diagnosis.is_reviewed and diagnosis.date_reviewed:
+                        activities.append({
+                            'id': f"{diagnosis.id}-view",
+                            'type': 'view',
+                            'title': 'Report Viewed',
+                            'description': f'Viewed diagnostic report: {diagnosis.name}',
+                            'date': diagnosis.date_reviewed.isoformat(),
+                            'time': '12:00 PM',  # Default time since we don't track exact viewing time
+                            'status': 'success',
+                            'details': None
+                        })
+            
+            # Sort activities by date and time (most recent first)
+            activities.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+            
+            return Response({
+                'activities': activities
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching patient activity history: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PatientActivityStatsAPIView(APIView):
+    """
+    Get activity statistics for the authenticated patient.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            
+            
+            cases = Diagnosticcase.objects.filter(user=user).prefetch_related(
+                'inputs', 'diagnoses'
+            )
+            
+
+            uploads = Diagnosticinput.objects.filter(
+                diagnostic_case__user=user
+            ).count()
+            
+            
+            analyses = Diagnosis.objects.filter(
+                diagnostic_case__user=user
+            ).count()
+            
+            #
+            downloads = Diagnosis.objects.filter(
+                diagnostic_case__user=user,
+                is_reviewed=True
+            ).count()
+            
+            
+            views = Diagnosis.objects.filter(
+                diagnostic_case__user=user,
+                is_reviewed=True
+            ).count()
+            
+            total_activities = uploads + analyses + downloads + views
+            
+            stats = {
+                'total_activities': total_activities,
+                'uploads': uploads,
+                'analyses': analyses,
+                'downloads': downloads,
+                'views': views
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching patient activity stats: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

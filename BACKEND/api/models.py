@@ -133,7 +133,12 @@ class Diagnosticcase(models.Model):
 
 class Diagnosticinput(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    diagnostic_case = models.ForeignKey(Diagnosticcase, on_delete=models.CASCADE, db_column='case_id')
+    diagnostic_case = models.ForeignKey(
+        Diagnosticcase, 
+        on_delete=models.CASCADE, 
+        db_column='case_id',
+        related_name='inputs' 
+    )
     input_type = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     file_url = models.URLField(max_length=1024, blank=True, null=True)
@@ -286,8 +291,13 @@ class Recommendation(models.Model):
         on_delete=models.CASCADE,
         related_name='recommendations'
     )
-    #guideline_used = models.ForeignKey(Clinicalguideline, models.PROTECT, blank=True, null=True)
-    name = models.TextField(blank=True, null=True)
+    
+    #recommended_text = models.TextField(blank=True, null=True) 
+    category = models.CharField(max_length=255, blank=True, null=True) 
+    type = models.CharField(max_length=100, blank=True, null=True)     
+    description = models.TextField(blank=True, null=True)              
+    name = models.TextField(blank=True, null=True) 
+    
     generated_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     is_reviewed = models.BooleanField(default=False, blank=True, null=True)
 
@@ -297,4 +307,4 @@ class Recommendation(models.Model):
         db_table_comment = 'Treatment recommendation based on diagnosis and guidelines'
 
     def __str__(self):
-        return f"Recommendation for Diagnosis {self.id}"
+        return f"{self.type}: {self.name[:30]}..."

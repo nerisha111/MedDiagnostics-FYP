@@ -86,6 +86,7 @@ export default function App() {
      
           <Route path="/patient/login" element={<PatientSignIn />} />
           <Route path="/patient/register" element={<PatientSignUp />} />
+          <Route path="/recover" element={<PasswordRecovery />} />
           <Route path="/patient/loading" element={<AnalysisLoading />} /> 
           <Route path="/patient/results" element={<PatientAnalysisResults />} /> 
  

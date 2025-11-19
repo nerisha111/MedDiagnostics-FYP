@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 
 export function HealthcareProfessionalRegistration() {
-  const navigate = useNavigate(); // 3. Initialize the navigate function
+  const navigate = useNavigate();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState("");
@@ -57,7 +57,6 @@ export function HealthcareProfessionalRegistration() {
     confirmPassword: false,
   });
 
-  {/*state to handle submission*/}
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -106,37 +105,35 @@ export function HealthcareProfessionalRegistration() {
       newErrors.department = "Department is required.";
       isValid = false;
     }
- // Email validation with domain check
-if (!email.trim()) {
-  newErrors.email = "Email is required.";
-  isValid = false;
-} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-  newErrors.email = "Please enter a valid email address.";
-  isValid = false;
-} else {
-  // Safely extract domain after the @ symbol
-  const parts = email.split("@");
-  const domain = parts.length > 1 ? parts[1].toLowerCase() : "";
 
-  // List of valid/common email domains
-  const validDomains = [
-    "gmail.com", "yahoo.com", "outlook.com", "hotmail.com",
-    "icloud.com", "live.com", "msn.com", "aol.com",
-    "protonmail.com", "proton.me", "mail.com", "zoho.com",
-    "yandex.com", "gmx.com", "me.com", "mac.com"
-  ];
+    // Email validation with domain check
+    if (!email.trim()) {
+      newErrors.email = "Email is required.";
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = "Please enter a valid email address.";
+      isValid = false;
+    } else {
+      const parts = email.split("@");
+      const domain = parts.length > 1 ? parts[1].toLowerCase() : "";
 
-  // Check if domain matches a known provider OR a valid general pattern
-  const isValidDomain =
-    validDomains.includes(domain) ||
-    /^[\w-]+(\.[\w-]+)*\.(com|net|org|edu|gov|mil|co|info|biz)$/i.test(domain);
+      const validDomains = [
+        "gmail.com", "yahoo.com", "outlook.com", "hotmail.com",
+        "icloud.com", "live.com", "msn.com", "aol.com",
+        "protonmail.com", "proton.me", "mail.com", "zoho.com",
+        "yandex.com", "gmx.com", "me.com", "mac.com"
+      ];
 
-  if (!isValidDomain) {
-    newErrors.email =
-      "Please enter an email from a valid domain.";
-    isValid = false;
-  }
-}
+      const isValidDomain =
+        validDomains.includes(domain) ||
+        /^[\w-]+(\.[\w-]+)*\.(com|net|org|edu|gov|mil|co|info|biz)$/i.test(domain);
+
+      if (!isValidDomain) {
+        newErrors.email = "Please enter an email from a valid domain.";
+        isValid = false;
+      }
+    }
+
     // Date of Birth validation with age check
     if (!dob) {
       newErrors.dob = "Date of birth is required.";
@@ -148,7 +145,6 @@ if (!email.trim()) {
       const monthDiff = today.getMonth() - birthDate.getMonth();
       const dayDiff = today.getDate() - birthDate.getDate();
       
-      // Calculate exact age
       const exactAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
       
       if (birthDate > today) {
@@ -167,13 +163,8 @@ if (!email.trim()) {
     } else {
       const cleanLicense = licenseNumber.replace(/\s+/g, '').toUpperCase();
       
-      // Check for NPI format (10 digits)
       const npiPattern = /^(NPI)?[0-9]{10}$/;
-      
-      // Check for DEA format (2 letters + 7 digits)
       const deaPattern = /^[A-Z]{2}[0-9]{7}$/;
-      
-      // Check for state license (alphanumeric, 5-15 characters)
       const stateLicensePattern = /^[A-Z0-9-]{5,15}$/;
       
       const isValidNPI = npiPattern.test(cleanLicense);
@@ -185,7 +176,6 @@ if (!email.trim()) {
         isValid = false;
       }
       
-      // Additional validation: NPI numbers must start with 1, 2, 3, or 4
       if (isValidNPI) {
         const npiDigits = cleanLicense.replace(/^NPI/, '');
         if (!['1', '2', '3', '4'].includes(npiDigits[0])) {
@@ -225,30 +215,39 @@ if (!email.trim()) {
 
     if (validateForm()) {
       setIsSubmitting(true);
+      let supabaseUserId: string | null = null;
 
-      // --- ADD THE 'try' KEYWORD HERE ---
       try { 
+        // Step 1: Create Supabase user
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email,
           password: password,
           options: {
             data: {
-              full_name: `${firstName} ${lastName}`, // Correctly combines names
-              role: role,                         // Correctly passes the role
+              full_name: `${firstName} ${lastName}`,
+              role: role,
             },
           },
         });
 
         if (authError) {
-          throw authError; // This will now be caught by the catch block
+          // Handle specific Supabase errors
+          if (authError.message.includes("already registered")) {
+            throw new Error("This email is already registered. Please login instead.");
+          }
+          throw authError;
         }
 
         if (!authData.user) {
           throw new Error("Supabase registration failed: User object not returned.");
         }
 
+        supabaseUserId = authData.user.id;
+        console.log("Supabase user created:", supabaseUserId);
+
+        // Step 2: Create user in Django database
         const registrationData = {
-          id: authData.user.id,
+          id: supabaseUserId,
           first_name: firstName,
           last_name: lastName,
           gender,
@@ -258,15 +257,51 @@ if (!email.trim()) {
           date_of_birth: dob,
           medical_license_number: licenseNumber,
         };
-       //add user to user table if auth suceeds
-        await axios.post('/api/register/clinician/', registrationData);
-      
-        
-        toast.success("Registration successful! You can now log in.");
-        navigate('/healthcare/login');
+
+        console.log("Sending to Django:", registrationData);
+
+        try {
+          await axios.post('/api/register/clinician/', registrationData);
+          
+          toast.success("Registration successful! You can now log in.");
+          navigate('/healthcare/login');
+          
+        } catch (dbError: any) {
+          console.error("Database registration error:", dbError);
+          
+          // If Django registration fails, delete the Supabase user to keep data consistent
+          if (supabaseUserId) {
+            console.log("Cleaning up Supabase user due to database error...");
+            try {
+              // Sign out and attempt to delete the user
+              await supabase.auth.signOut();
+              // Note: You may need admin privileges to delete users from Supabase
+              // For now, we'll just sign them out
+            } catch (cleanupError) {
+              console.error("Error during cleanup:", cleanupError);
+            }
+          }
+          
+          // Provide a helpful error message
+          const dbErrorMessage = dbError.response?.data?.detail 
+            || dbError.response?.data?.message 
+            || dbError.response?.data?.email?.[0]
+            || "Database registration failed. Please contact support.";
+          
+          throw new Error(dbErrorMessage);
+        }
 
       } catch (error: any) {
-        const errorMessage = error.response?.data?.email?.[0] || error.message || "An unknown error occurred.";
+        let errorMessage = "An unknown error occurred.";
+        
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.response?.data) {
+          errorMessage = error.response.data.detail 
+            || error.response.data.message 
+            || error.response.data.email?.[0]
+            || JSON.stringify(error.response.data);
+        }
         
         console.error("Registration failed:", errorMessage);
         setServerError(errorMessage);
@@ -300,7 +335,6 @@ if (!email.trim()) {
           <div className="p-8 space-y-6">
             {/* Back Button */}
             <button
-              
               onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
@@ -339,6 +373,7 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("firstName")}
                     className={touched.firstName && errors.firstName ? "border-[#E63946]" : ""}
+                    disabled={isSubmitting}
                   />
                   {touched.firstName && errors.firstName && (
                     <p className="text-sm text-[#E63946]">{errors.firstName}</p>
@@ -358,6 +393,7 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("lastName")}
                     className={touched.lastName && errors.lastName ? "border-[#E63946]" : ""}
+                    disabled={isSubmitting}
                   />
                   {touched.lastName && errors.lastName && (
                     <p className="text-sm text-[#E63946]">{errors.lastName}</p>
@@ -365,7 +401,7 @@ if (!email.trim()) {
                 </div>
               </div>
 
-{/* Gender */}
+              {/* Gender */}
               <div className="space-y-2">
                 <Label>
                   Gender <span className="text-destructive">*</span>
@@ -376,6 +412,7 @@ if (!email.trim()) {
                     setGender(value);
                   }}
                   className="flex gap-4"
+                  disabled={isSubmitting}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="male" id="male" />
@@ -401,7 +438,7 @@ if (!email.trim()) {
                 )}
               </div>
 
-{/* Role and Department */}
+              {/* Role and Department */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="role">
@@ -412,6 +449,7 @@ if (!email.trim()) {
                     onValueChange={(value: string) => {
                       setRole(value);
                     }}
+                    disabled={isSubmitting}
                   >
                     <SelectTrigger
                       id="role"
@@ -442,6 +480,7 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("department")}
                     className={touched.department && errors.department ? "border-[#E63946]" : ""}
+                    disabled={isSubmitting}
                   />
                   {touched.department && errors.department && (
                     <p className="text-sm text-[#E63946]">{errors.department}</p>
@@ -466,6 +505,7 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("email")}
                     className={touched.email && errors.email ? "border-[#E63946]" : ""}
+                    disabled={isSubmitting}
                   />
                   {touched.email && errors.email && (
                     <p className="text-sm text-[#E63946]">{errors.email}</p>
@@ -485,6 +525,7 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("dob")}
                     className={touched.dob && errors.dob ? "border-[#E63946]" : ""}
+                    disabled={isSubmitting}
                   />
                   {touched.dob && errors.dob && (
                     <p className="text-sm text-[#E63946]">{errors.dob}</p>
@@ -492,7 +533,7 @@ if (!email.trim()) {
                 </div>
               </div>
 
-{/* Medical License Number */}
+              {/* Medical License Number */}
               <div className="space-y-2">
                 <Label htmlFor="licenseNumber">
                   Medical License Number <span className="text-destructive">*</span>
@@ -508,6 +549,7 @@ if (!email.trim()) {
                   }}
                   onBlur={() => handleBlur("licenseNumber")}
                   className={touched.licenseNumber && errors.licenseNumber ? "border-[#E63946]" : ""}
+                  disabled={isSubmitting}
                 />
                 {touched.licenseNumber && errors.licenseNumber && (
                   <p className="text-sm text-[#E63946]">{errors.licenseNumber}</p>
@@ -537,11 +579,13 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("password")}
                     className={`pr-10 ${touched.password && errors.password ? "border-[#E63946]" : ""}`}
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isSubmitting}
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -597,11 +641,13 @@ if (!email.trim()) {
                     }}
                     onBlur={() => handleBlur("confirmPassword")}
                     className={`pr-10 ${touched.confirmPassword && errors.confirmPassword ? "border-[#E63946]" : ""}`}
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isSubmitting}
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -620,23 +666,23 @@ if (!email.trim()) {
 
               {/* Server Error Display */}
               {serverError && (
-                <div className="text-center p-2 rounded-md bg-destructive/10 text-destructive">
-                  {serverError}
+                <div className="text-center p-3 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                  <p className="text-sm font-medium">{serverError}</p>
                 </div>
               )}
 
               {/* Submit Buttons */}
               <div className="flex gap-2 pt-4">
-              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registering...
-                  </>
-                ) : (
-                  "Register"
-                )}
-              </Button>
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Registering...
+                    </>
+                  ) : (
+                    "Register"
+                  )}
+                </Button>
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -646,7 +692,6 @@ if (!email.trim()) {
                 >
                   Back to Login
                 </Button>
-
               </div>
             </form>
           </div>
