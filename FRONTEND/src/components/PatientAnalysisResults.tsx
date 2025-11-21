@@ -23,10 +23,11 @@ import {
   Stethoscope,
   Microscope,
   Brain,
-  Target
+  Target,
+  Pill
 } from "lucide-react";
 import { format } from 'date-fns';
-import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useState } from 'react';
+import { useState } from 'react';
 import autoTable from 'jspdf-autotable';
 import jsPDF from 'jspdf';
 
@@ -112,12 +113,13 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
     return "destructive";
   };
   
-  const getCategoryIcon = (category: string) => {
-    const categoryLower = category.toLowerCase();
-    if (categoryLower.includes('imaging')) return <Image className="w-4 h-4" />;
-    if (categoryLower.includes('laboratory') || categoryLower.includes('lab')) return <FlaskConical className="w-4 h-4" />;
-    if (categoryLower.includes('treatment')) return <Heart className="w-4 h-4" />;
-    if (categoryLower.includes('follow')) return <Clock className="w-4 h-4" />;
+  // FIXED: Added safety check for undefined category
+  const getCategoryIcon = (category?: string) => {
+    const categoryLower = (category || "unknown").toLowerCase();
+    if (categoryLower.includes('imaging') || categoryLower.includes('images')) return <Image className="w-4 h-4" />;
+    if (categoryLower.includes('lab') || categoryLower.includes('blood')) return <FlaskConical className="w-4 h-4" />;
+    if (categoryLower.includes('treatment') || categoryLower.includes('medication')) return <Pill className="w-4 h-4" />;
+    if (categoryLower.includes('notes') || categoryLower.includes('document')) return <FileText className="w-4 h-4" />;
     if (categoryLower.includes('specialist')) return <Stethoscope className="w-4 h-4" />;
     return <Activity className="w-4 h-4" />;
   };
@@ -131,7 +133,7 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       const pageHeight = pdf.internal.pageSize.getHeight();
       let yPos = 20;
       
-      
+      // Header
       pdf.setFillColor(13, 148, 136); 
       pdf.rect(0, 0, pageWidth, 40, 'F');
       
@@ -146,7 +148,7 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       
       yPos = 50;
       
-      
+      // Case Info Box
       pdf.setDrawColor(200, 200, 200);
       pdf.setFillColor(250, 250, 250);
       pdf.roundedRect(15, yPos, pageWidth - 30, 25, 3, 3, 'FD');
@@ -155,7 +157,6 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       
-      // Three columns
       const col1X = 20;
       const col2X = 85;
       const col3X = 150;
@@ -175,9 +176,7 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       
       yPos += 35;
       
-      // ========================================
       // PRIMARY DIAGNOSIS SECTION
-      // ========================================
       pdf.setFillColor(240, 248, 255);
       pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
       
@@ -188,7 +187,6 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       
       yPos += 15;
       
-      // Diagnosis name
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'bold');
@@ -196,14 +194,12 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       pdf.text(diagnosisLines, 20, yPos);
       yPos += diagnosisLines.length * 6 + 3;
       
-      // Confidence badge
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(100, 100, 100);
       pdf.text(`AI Confidence Model: ${primaryDiagnosis.confidence}%`, 20, yPos);
       yPos += 8;
       
-      // Description
       if (primaryDiagnosis.description) {
         pdf.setFontSize(9);
         pdf.setTextColor(80, 80, 80);
@@ -212,7 +208,6 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
         yPos += descLines.length * 5 + 5;
       }
       
-      // ICD-10 if available
       if (primaryDiagnosis.icd10) {
         pdf.setFontSize(9);
         pdf.setTextColor(100, 100, 100);
@@ -220,17 +215,10 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
         yPos += 8;
       }
       
-      // ========================================
       // DIFFERENTIAL DIAGNOSES
-      // ========================================
       if (differentialDiagnoses.length > 0) {
         yPos += 5;
-        
-        // Check if we need a new page
-        if (yPos > pageHeight - 60) {
-          pdf.addPage();
-          yPos = 20;
-        }
+        if (yPos > pageHeight - 60) { pdf.addPage(); yPos = 20; }
         
         pdf.setFillColor(240, 248, 255);
         pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
@@ -239,37 +227,24 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
         pdf.text('DIFFERENTIAL DIAGNOSES', 20, yPos + 8);
-        
         yPos += 15;
         
         differentialDiagnoses.forEach((diagnosis: any, index: number) => {
-          if (yPos > pageHeight - 20) {
-            pdf.addPage();
-            yPos = 20;
-          }
-          
+          if (yPos > pageHeight - 20) { pdf.addPage(); yPos = 20; }
           pdf.setTextColor(0, 0, 0);
           pdf.setFontSize(10);
           pdf.setFont('helvetica', 'normal');
-          
           const diagText = `${index + 1}. ${diagnosis.name} (${diagnosis.confidence}% confidence)`;
           const lines = pdf.splitTextToSize(diagText, pageWidth - 40);
           pdf.text(lines, 20, yPos);
           yPos += lines.length * 5 + 3;
         });
-        
         yPos += 5;
       }
       
-      // ========================================
-      // KEY CLINICAL FINDINGS
-      // ========================================
+      // FINDINGS
       if (findings.length > 0) {
-        // Check if we need a new page
-        if (yPos > pageHeight - 60) {
-          pdf.addPage();
-          yPos = 20;
-        }
+        if (yPos > pageHeight - 60) { pdf.addPage(); yPos = 20; }
         
         pdf.setFillColor(240, 248, 255);
         pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
@@ -278,36 +253,23 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
         pdf.text('KEY CLINICAL FINDINGS', 20, yPos + 8);
-        
         yPos += 15;
         
         findings.forEach((finding: string) => {
-          if (yPos > pageHeight - 20) {
-            pdf.addPage();
-            yPos = 20;
-          }
-          
+          if (yPos > pageHeight - 20) { pdf.addPage(); yPos = 20; }
           pdf.setTextColor(0, 0, 0);
           pdf.setFontSize(9);
           pdf.setFont('helvetica', 'normal');
-          
           const findingLines = pdf.splitTextToSize(`• ${finding}`, pageWidth - 40);
           pdf.text(findingLines, 20, yPos);
           yPos += findingLines.length * 5 + 2;
         });
-        
         yPos += 5;
       }
       
-      // ========================================
-      // RECOMMENDATIONS & PLAN TABLE
-      // ========================================
+      // TABLE: RECOMMENDATIONS
       if (nextSteps.length > 0 || recommendedTests.length > 0 || recommendedTreatments.length > 0) {
-        // Check if we need a new page
-        if (yPos > pageHeight - 80) {
-          pdf.addPage();
-          yPos = 20;
-        }
+        if (yPos > pageHeight - 80) { pdf.addPage(); yPos = 20; }
         
         pdf.setFillColor(240, 248, 255);
         pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
@@ -316,77 +278,32 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
         pdf.text('RECOMMENDATIONS & PLAN', 20, yPos + 8);
-        
         yPos += 15;
         
-        // Prepare table data
         const tableData: any[] = [];
         let rowNum = 1;
         
-        // Add next steps
-        nextSteps.forEach((step: any) => {
-          tableData.push([
-            rowNum++,
-            step.action,
-            step.category || 'General'
-          ]);
-        });
+        nextSteps.forEach((step: any) => tableData.push([rowNum++, step.action, step.category || 'General']));
+        recommendedTests.forEach((test: any) => tableData.push([rowNum++, test.test_name || test.name, 'Test / ' + (test.test_category || 'Diagnostic')]));
+        recommendedTreatments.forEach((treatment: any) => tableData.push([rowNum++, treatment.treatment_name || treatment.name, 'Treatment']));
         
-        // Add recommended tests
-        recommendedTests.forEach((test: any) => {
-          tableData.push([
-            rowNum++,
-            test.test_name || test.name,
-            'Test / ' + (test.test_category || 'Diagnostic')
-          ]);
-        });
-        
-        // Add recommended treatments
-        recommendedTreatments.forEach((treatment: any) => {
-          tableData.push([
-            rowNum++,
-            treatment.treatment_name || treatment.name,
-            'Treatment'
-          ]);
-        });
-        
-        // Generate table
         autoTable(pdf, {
           startY: yPos,
           head: [['#', 'Recommended Action / Test / Treatment', 'Category']],
           body: tableData,
           theme: 'grid',
-          headStyles: {
-            fillColor: [13, 148, 136],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            fontSize: 9
-          },
-          bodyStyles: {
-            fontSize: 9,
-            textColor: [0, 0, 0]
-          },
-          alternateRowStyles: {
-            fillColor: [250, 250, 250]
-          },
-          columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 130 },
-            2: { cellWidth: 40 }
-          },
+          headStyles: { fillColor: [13, 148, 136], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+          bodyStyles: { fontSize: 9, textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 130 }, 2: { cellWidth: 40 } },
           margin: { left: 15, right: 15 }
         });
         
         yPos = (pdf as any).lastAutoTable.finalY + 10;
       }
       
-      // ========================================
-      // CONFIDENTIAL DISCLAIMER
-      // ========================================
-      if (yPos > pageHeight - 40) {
-        pdf.addPage();
-        yPos = 20;
-      }
+      // DISCLAIMER
+      if (yPos > pageHeight - 40) { pdf.addPage(); yPos = 20; }
       
       pdf.setFillColor(255, 248, 220);
       pdf.setDrawColor(255, 193, 7);
@@ -402,34 +319,20 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
       const disclaimerLines = pdf.splitTextToSize(disclaimerText, pageWidth - 40);
       pdf.text(disclaimerLines, 20, yPos + 14);
       
-      yPos += 30;
-      
-      // ========================================
-      // FOOTER
-      // ========================================
+      // Footer Page Numbers
       const totalPages = pdf.internal.pages.length - 1;
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
         pdf.setFontSize(8);
         pdf.setTextColor(150, 150, 150);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(
-          `Page ${i} of ${totalPages}`,
-          pageWidth / 2,
-          pageHeight - 10,
-          { align: 'center' }
-        );
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
       }
       
-      // ========================================
-      // SAVE PDF
-      // ========================================
-      const fileName = `Medical_Report_${format(new Date(), 'yyyy-MM-dd')}_${caseId?.substring(0, 8) || 'analysis'}.pdf`;
-      pdf.save(fileName);
+      pdf.save(`Medical_Report_${format(new Date(), 'yyyy-MM-dd')}_${caseId?.substring(0, 8) || 'analysis'}.pdf`);
       
     } catch (error) {
       console.error('PDF generation error:', error);
-      alert('Failed to generate PDF. Please try again.');
+      alert('Failed to generate PDF.');
     } finally {
       setDownloading(false);
     }
@@ -446,24 +349,14 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
               <Clock className="w-4 h-4" />
               Completed: {format(new Date(), 'MMMM dd, yyyy, h:mm a')}
             </p>
-            {caseId && (
-              <p className="text-xs text-muted-foreground mt-1">Case ID: {caseId}</p>
-            )}
+            {caseId && <p className="text-xs text-muted-foreground mt-1">Case ID: {caseId}</p>}
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
-              className="w-1/2 sm:w-auto"
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-            >
+            <Button variant="outline" className="w-1/2 sm:w-auto" onClick={handleDownloadPDF} disabled={downloading}>
               <Download className="w-4 h-4 mr-2" />
               {downloading ? 'Generating...' : 'PDF'}
             </Button>
-            <Button 
-              onClick={() => navigate('/patient/dashboard')} 
-              className="w-1/2 sm:w-auto"
-            >
+            <Button onClick={() => navigate('/patient/dashboard')} className="w-1/2 sm:w-auto">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Dashboard
             </Button>
@@ -475,12 +368,9 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
           <div className="flex items-start gap-4">
             <Info className="w-8 h-8 text-amber-600 flex-shrink-0 mt-1" />
             <div>
-              <h3 className="text-lg font-bold text-amber-900">
-                This is AI-Assisted Analysis, Not a Medical Diagnosis
-              </h3>
+              <h3 className="text-lg font-bold text-amber-900">This is AI-Assisted Analysis, Not a Medical Diagnosis</h3>
               <p className="text-sm text-amber-800 mt-2">
-                This report was generated by artificial intelligence based on the data you provided. 
-                It is designed to help you and your healthcare provider understand your health better.
+                This report was generated by artificial intelligence. It helps you understand your health but is not a diagnosis.
               </p>
               <p className="text-sm font-semibold text-amber-900 mt-3">
                 ⚠️ Do NOT use this as a substitute for professional medical advice. Always consult your doctor.
@@ -500,40 +390,27 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
                     Primary Finding
                   </CardTitle>
                 </div>
-                <Badge 
-                  variant={getConfidenceBadgeVariant(primaryDiagnosis.confidence)}
-                  className="text-sm px-3 py-1"
-                >
+                <Badge variant={getConfidenceBadgeVariant(primaryDiagnosis.confidence)} className="text-sm px-3 py-1">
                   {primaryDiagnosis.confidence}% Confidence
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <h2 className="text-2xl font-bold text-primary mb-3">
-                  {primaryDiagnosis.name}
-                </h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  {primaryDiagnosis.description}
-                </p>
+                <h2 className="text-2xl font-bold text-primary mb-3">{primaryDiagnosis.name}</h2>
+                <p className="text-muted-foreground leading-relaxed">{primaryDiagnosis.description}</p>
               </div>
-              
               {primaryDiagnosis.icd10 && (
                 <div className="p-3 bg-muted rounded-lg border">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-semibold">ICD-10 Code:</span> {primaryDiagnosis.icd10}
-                  </p>
+                  <p className="text-sm text-muted-foreground"><span className="font-semibold">ICD-10 Code:</span> {primaryDiagnosis.icd10}</p>
                 </div>
               )}
-              
               <div className={`p-4 rounded-lg border-2 ${getConfidenceColor(primaryDiagnosis.confidence)}`}>
                 <p className="font-semibold flex items-center gap-2 mb-2">
-                  <UserCheck className="w-5 h-5" />
-                  Most Important Next Step
+                  <UserCheck className="w-5 h-5" /> Most Important Next Step
                 </p>
                 <p className="text-sm">
-                  Schedule an appointment with your healthcare provider to discuss these findings 
-                  and create a personalized care plan.
+                  Schedule an appointment with your healthcare provider to discuss these findings and create a personalized care plan.
                 </p>
               </div>
             </CardContent>
@@ -544,8 +421,7 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
             <Card className="overflow-hidden shadow-sm">
               <CardHeader className="bg-white">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Microscope className="w-5 h-5 text-primary" />
-                  Data Analyzed
+                  <Microscope className="w-5 h-5 text-primary" /> Data Analyzed
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
@@ -586,29 +462,21 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
             <Card className="overflow-hidden shadow-sm">
               <CardHeader className="bg-white">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-primary" />
-                  Alternative Possibilities to Consider
+                  <Brain className="w-5 h-5 text-primary" /> Alternative Possibilities
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Other conditions that share similar characteristics
-                </p>
+                <p className="text-sm text-muted-foreground mt-1">Other conditions sharing similar characteristics</p>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-3">
-                  {differentialDiagnoses.map((diagnosis: { name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; confidence: any; }, idx: number) => (
-                    <div 
-                      key={`${diagnosis.name}-${idx}`}
-                      className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border"
-                    >
+                  {differentialDiagnoses.map((diagnosis: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
                       <div className="flex items-center gap-3 flex-1">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
                           {idx + 1}
                         </div>
                         <p className="font-medium">{diagnosis.name}</p>
                       </div>
-                      <Badge variant="outline" className="ml-2">
-                        {diagnosis.confidence}%
-                      </Badge>
+                      <Badge variant="outline" className="ml-2">{diagnosis.confidence}%</Badge>
                     </div>
                   ))}
                 </div>
@@ -621,16 +489,12 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
             <Card className="overflow-hidden shadow-sm">
               <CardHeader className="bg-white">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Key Clinical Findings
+                  <TrendingUp className="w-5 h-5 text-primary" /> Key Clinical Findings
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Important observations from your medical data
-                </p>
               </CardHeader>
               <CardContent className="p-6">
                 <ul className="space-y-3">
-                  {findings.map((finding: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
+                  {findings.map((finding: string, index: number) => (
                     <li key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                       <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-muted-foreground flex-1">{finding}</p>
@@ -641,149 +505,64 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
             </Card>
           )}
 
-          {/* Action Plan - Next Steps */}
-          {nextSteps.length > 0 && (
+          {/* Recommendations - Unified List */}
+          {(nextSteps.length > 0 || recommendedTests.length > 0 || recommendedTreatments.length > 0) && (
             <Card className="overflow-hidden shadow-sm border-2 border-primary/20">
               <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart className="w-5 h-5 text-primary" />
-                  Your Recommended Action Plan
+                  <BarChart className="w-5 h-5 text-primary" /> Your Recommended Action Plan
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Important steps to take - discuss these with your doctor
-                </p>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {nextSteps.map((step: { category: string; action: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, index: Key | null | undefined) => (
-                    <div 
-                      key={index}
-                      className="flex items-start gap-4 p-4 rounded-lg bg-white border hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 flex-shrink-0">
-                        {getCategoryIcon(step.category)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs">
-                            {step.category}
-                          </Badge>
+              <CardContent className="p-6 space-y-6">
+                
+                {/* Next Steps */}
+                {nextSteps.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2"><Activity className="w-4 h-4" /> Immediate Actions</h4>
+                    {nextSteps.map((step: any, idx: number) => (
+                      <div key={idx} className="flex items-start gap-4 p-4 rounded-lg bg-white border">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          {getCategoryIcon(step.category)}
                         </div>
-                        <p className="text-sm text-muted-foreground">{step.action}</p>
+                        <div className="flex-1">
+                          <Badge variant="outline" className="mb-1 text-xs">{step.category || "Action"}</Badge>
+                          <p className="text-sm text-muted-foreground">{step.action}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Treatments */}
+                {recommendedTreatments.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2"><Heart className="w-4 h-4 text-red-500" /> Suggested Treatments</h4>
+                    {recommendedTreatments.map((t: any, idx: number) => (
+                      <div key={idx} className="p-3 rounded-lg bg-red-50/50 border border-red-100">
+                        <p className="font-medium text-sm">{t.treatment_name || t.name}</p>
+                        <p className="text-xs text-muted-foreground">{t.description || "Standard therapy"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tests */}
+                {recommendedTests.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2"><FlaskConical className="w-4 h-4 text-green-500" /> Recommended Tests</h4>
+                    {recommendedTests.map((t: any, idx: number) => (
+                      <div key={idx} className="p-3 rounded-lg bg-green-50/50 border border-green-100">
+                        <p className="font-medium text-sm">{t.test_name || t.name}</p>
+                        <p className="text-xs text-muted-foreground">{t.rationale || "Diagnostic confirmation"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
               </CardContent>
             </Card>
           )}
 
-          {/* Recommended Tests */}
-          {recommendedTests.length > 0 && (
-            <Card className="overflow-hidden shadow-sm">
-              <CardHeader className="bg-white">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FlaskConical className="w-5 h-5 text-primary" />
-                  Recommended Diagnostic Tests
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  {recommendedTests.map((test: { test_name: any; name: any; priority: any; rationale: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; test_category: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, index: Key | null | undefined) => (
-                    <div key={index} className="p-4 rounded-lg bg-muted/50 border">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="font-medium">{test.test_name || test.name}</p>
-                        {test.priority && (
-                          <Badge variant="secondary" className="text-xs">
-                            {test.priority}
-                          </Badge>
-                        )}
-                      </div>
-                      {test.rationale && (
-                        <p className="text-sm text-muted-foreground">{test.rationale}</p>
-                      )}
-                      {test.test_category && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Category: {test.test_category}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Recommended Treatments */}
-          {recommendedTreatments.length > 0 && (
-            <Card className="overflow-hidden shadow-sm">
-              <CardHeader className="bg-white">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-primary" />
-                  Suggested Treatment Options
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Discuss these options with your healthcare provider
-                </p>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  {recommendedTreatments.map((treatment: { treatment_name: any; name: any; treatment_line: any; description: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; treatment_category: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, index: Key | null | undefined) => (
-                    <div key={index} className="p-4 rounded-lg bg-muted/50 border">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="font-medium">{treatment.treatment_name || treatment.name}</p>
-                        {treatment.treatment_line && (
-                          <Badge variant="secondary" className="text-xs">
-                            {treatment.treatment_line}
-                          </Badge>
-                        )}
-                      </div>
-                      {treatment.description && (
-                        <p className="text-sm text-muted-foreground">{treatment.description}</p>
-                      )}
-                      {treatment.treatment_category && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Category: {treatment.treatment_category}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Clinical Guidelines (if available) */}
-          {clinicalGuidelines && Object.keys(clinicalGuidelines).length > 0 && (
-            <Card className="overflow-hidden shadow-sm bg-blue-50/30">
-              <CardHeader className="bg-white">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  Clinical Guidelines Reference
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-3">
-                {clinicalGuidelines.diagnosis_name && (
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Condition:</p>
-                    <p className="text-sm">{clinicalGuidelines.diagnosis_name}</p>
-                  </div>
-                )}
-                {clinicalGuidelines.icd10_code && (
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">ICD-10:</p>
-                    <p className="text-sm">{clinicalGuidelines.icd10_code}</p>
-                  </div>
-                )}
-                {clinicalGuidelines.summary && (
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Summary:</p>
-                    <p className="text-sm text-muted-foreground">{clinicalGuidelines.summary}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </main>
         
         {/* Footer */}
@@ -795,23 +574,17 @@ export function PatientAnalysisResults({ onFeedback }: PatientAnalysisResultsPro
                 <div>
                   <p className="font-semibold text-sm mb-1">Your Privacy is Protected</p>
                   <p className="text-sm text-muted-foreground">
-                    This analysis is confidential and stored securely. Share these results only with 
-                    healthcare providers you trust.
+                    This analysis is confidential and stored securely. Share these results only with healthcare providers you trust.
                   </p>
                 </div>
               </div>
-              
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
                 {onFeedback && (
                   <Button variant="outline" onClick={onFeedback} className="flex-1">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Provide Feedback
+                    <MessageSquare className="w-4 h-4 mr-2" /> Provide Feedback
                   </Button>
                 )}
-                <Button 
-                  onClick={() => navigate('/patient/upload')} 
-                  className="flex-1"
-                >
+                <Button onClick={() => navigate('/patient/upload')} className="flex-1">
                   Upload New Data
                 </Button>
               </div>

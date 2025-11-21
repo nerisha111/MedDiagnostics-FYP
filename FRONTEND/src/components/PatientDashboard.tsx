@@ -24,7 +24,12 @@ import {
   Activity,
   Calendar,
   TrendingUp,
-  FlaskConical
+  FlaskConical,
+  Shield,
+  AlertCircle,
+  CheckCircle2,
+  Heart,
+  Brain
 } from "lucide-react";
 
 // --- Types for Dynamic Data ---
@@ -80,8 +85,8 @@ export function DashboardHome() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-muted/20 animate-pulse rounded-xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2].map((i) => <div key={i} className="h-64 bg-muted/20 animate-pulse rounded-xl" />)}
         </div>
         <div className="h-48 bg-muted/20 animate-pulse rounded-xl" />
       </div>
@@ -94,105 +99,213 @@ export function DashboardHome() {
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">{getTimeGreeting()}, {user?.firstName}</h2>
-          
+          <h2 className="text-3xl font-bold tracking-tight">{getTimeGreeting()}, {user?.firstName}</h2>
+          <p className="text-muted-foreground mt-2">Welcome back to your health dashboard</p>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm border">
+        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-full shadow-sm border">
           <Calendar className="w-4 h-4" /> 
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
       </div>
 
-      {/* Stats Row */}
-      
+      {/* AI Disclaimer Banner */}
+      <Card className="bg-amber-50 border-amber-200">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-900">Important Medical Disclaimer</p>
+              <p className="text-sm text-amber-800 leading-relaxed">
+                Our AI-powered analysis is designed to assist healthcare professionals and should not replace professional medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider for medical decisions.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Action Area */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-2 gap-6">
         
-        {/* Left Column: Hero Action (Spans 2 columns) */}
-        <div className="md:col-span-2 space-y-6">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-primary text-primary-foreground rounded-lg">
-                  <Upload className="w-5 h-5" />
-                </div>
-                <CardTitle>Start New Analysis</CardTitle>
+        {/* Left Column: Hero Action */}
+        <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-primary/20 shadow-lg">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-primary text-primary-foreground rounded-xl shadow-md">
+                <Upload className="w-6 h-6" />
               </div>
-              <CardDescription className="text-base">
-                Upload your latest medical images, clinical notes, or lab results. Our AI will process them securely and generate a detailed report.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => navigate("/patient/upload")} size="lg" className="shadow-md">
-                Upload Medical Data <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Quick Access Row (Styled nicer than original list) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 justify-start px-6 hover:border-primary/50 hover:bg-primary/5 transition-all"
-              onClick={() => navigate('/patient/reports')}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
-                  <FileCheck className="w-4 h-4" />
-                </div>
-                <div className="text-left">
-                  <div className="font-semibold">View Reports</div>
-                  <div className="text-xs text-muted-foreground">Access analysis history</div>
-                </div>
-              </div>
+              <CardTitle className="text-xl">Start New Analysis</CardTitle>
+            </div>
+            <CardDescription className="text-base leading-relaxed">
+              Upload your latest medical images, clinical notes, or lab results. Our secure AI system will process them and generate a comprehensive diagnostic report within minutes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-2">
+            <Button onClick={() => navigate("/patient/upload")} size="lg" className="w-full shadow-md text-base h-12">
+              Upload Medical Data <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
+            
+            <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
+              <Shield className="w-4 h-4 text-green-600" />
+              <span>HIPAA compliant • End-to-end encrypted</span>
+            </div>
+          </CardContent>
+        </Card>
 
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 justify-start px-6 hover:border-primary/50 hover:bg-primary/5 transition-all"
-              onClick={() => navigate('/patient/settings')}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-100 text-slate-600 rounded-full">
-                  <Settings className="w-4 h-4" />
-                </div>
-                <div className="text-left">
-                  <div className="font-semibold">Account Settings</div>
-                  <div className="text-xs text-muted-foreground">Manage preferences</div>
-                </div>
-              </div>
-            </Button>
-          </div>
-        </div>
-
-        {/* Right Column: Health Tip (Spans 1 column) */}
-        <div className="md:col-span-1">
-          <Card className="bg-slate-900 text-slate-50 border-none h-full flex flex-col justify-between shadow-xl relative overflow-hidden">
-             {/* Decorative background element */}
-             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
-             
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg text-emerald-400">
-                <TrendingUp className="w-5 h-5" />
-                Did you know?
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-slate-300 leading-relaxed">
-                AI-assisted diagnostics can reduce human error in image interpretation by providing a second opinion, often highlighting anomalies that might be overlooked in early stages.
+        {/* Right Column: Health Insight Card */}
+        <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-50 border-none shadow-xl relative overflow-hidden">
+          {/* Decorative background elements */}
+          <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-32 h-32 bg-blue-400/10 rounded-full blur-2xl pointer-events-none"></div>
+          
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg text-emerald-400">
+              <Brain className="w-5 h-5" />
+              AI Health Insight
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-white/5 rounded-lg p-4 backdrop-blur-sm">
+              <p className="text-slate-200 leading-relaxed text-base">
+                AI-assisted diagnostics can reduce human error in medical image interpretation by up to 30%, often highlighting subtle anomalies that might be overlooked in early-stage screenings.
               </p>
-              
-              <div className="pt-4 mt-auto">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <FlaskConical className="w-3 h-3" />
-                  <span>Medical Insight #42</span>
+            </div>
+            
+            <div className="flex items-center gap-3 pt-2">
+              <div className="p-2 bg-emerald-500/20 rounded-lg">
+                <FlaskConical className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Medical Research Insight</p>
+                <p className="text-sm text-slate-300 font-medium">Updated weekly from latest studies</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-primary" />
+          Quick Actions
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/reports')}>
+            <CardContent className="pt-6 pb-6">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="p-4 bg-blue-50 text-blue-600 rounded-full">
+                  <FileCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">View Reports</div>
+                  <div className="text-sm text-muted-foreground mt-1">Access your analysis history</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/history')}>
+            <CardContent className="pt-6 pb-6">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="p-4 bg-purple-50 text-purple-600 rounded-full">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">Activity History</div>
+                  <div className="text-sm text-muted-foreground mt-1">Track your health timeline</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/settings')}>
+            <CardContent className="pt-6 pb-6">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="p-4 bg-slate-50 text-slate-600 rounded-full">
+                  <Settings className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">Settings</div>
+                  <div className="text-sm text-muted-foreground mt-1">Manage your preferences</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/help')}>
+            <CardContent className="pt-6 pb-6">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="p-4 bg-green-50 text-green-600 rounded-full">
+                  <HelpCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">Get Help</div>
+                  <div className="text-sm text-muted-foreground mt-1">Support and resources</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
+      </div>
 
+      {/* Additional Information Section */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <CheckCircle2 className="w-5 h-5" />
+              Your Data Security
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm text-blue-900">HIPAA Compliant Storage</p>
+                <p className="text-sm text-blue-700 mt-1">All medical data is encrypted and stored securely following healthcare regulations</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm text-blue-900">Private & Confidential</p>
+                <p className="text-sm text-blue-700 mt-1">Your health information is never shared without your explicit consent</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-900">
+              <Heart className="w-5 h-5" />
+              How It Works
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+              <div>
+                <p className="font-medium text-sm text-green-900">Upload Your Data</p>
+                <p className="text-sm text-green-700 mt-1">Securely upload medical images or documents</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+              <div>
+                <p className="font-medium text-sm text-green-900">AI Analysis</p>
+                <p className="text-sm text-green-700 mt-1">Our system analyzes patterns and generates insights</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+              <div>
+                <p className="font-medium text-sm text-green-900">Review Results</p>
+                <p className="text-sm text-green-700 mt-1">Get your detailed report to share with your doctor</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

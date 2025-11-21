@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 
 // === CONFIGURATION ===
-// 🔥 IMPORTANT: Use your RunPod public URL, NOT localhost!
+
 const MEDICAL_AI_API_URL = "https://roffvw4k1z5a3n-8004.proxy.runpod.net";
 
 // === INTERFACES ===
@@ -251,7 +251,7 @@ export function PatientDataUpload() {
       ].filter(Boolean).join('\n\n');
 
       // Step 5: Analyze files using your EXISTING FastAPI endpoints
-      toast.info("🔬 Analyzing your medical data with AI...", {
+      toast.info(" Analyzing your medical data with AI...", {
         description: `Processing ${allFilesForAnalysis.length} file(s)`
       });
 
@@ -289,15 +289,15 @@ export function PatientDataUpload() {
           
           toast.info(`Analyzing ${fileData.name}...`);
           
-          console.log(`📤 Sending request to: ${endpoint}`);
-          console.log(`📄 File: ${fileData.name} (${fileExtension})`);
+          console.log(` Sending request to: ${endpoint}`);
+          console.log(` File: ${fileData.name} (${fileExtension})`);
           
           const response = await axios.post(endpoint, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 120000 // 2 minutes per file
           });
           
-          console.log(`✅ Response received:`, response.data);
+          console.log(` Response received:`, response.data);
           
           const result = JSON.parse(response.data.result);
           analysisResults.push({
@@ -306,10 +306,10 @@ export function PatientDataUpload() {
             result: result
           });
           
-          toast.success(`✅ ${fileData.name} analyzed`);
+          toast.success(` ${fileData.name} analyzed`);
           
         } catch (fileError: any) {
-          console.error(`❌ Error analyzing ${fileData.name}:`, fileError);
+          console.error(` Error analyzing ${fileData.name}:`, fileError);
           console.error('Error details:', {
             message: fileError.message,
             response: fileError.response?.data,
@@ -378,7 +378,7 @@ export function PatientDataUpload() {
         );
       }
       
-      toast.success("✅ Analysis complete!", {
+      toast.success(" Analysis complete!", {
         description: `Analyzed ${analysisResults.length} file(s)`
       });
       
@@ -546,13 +546,13 @@ export function PatientDataUpload() {
             <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-sm mb-1 text-blue-900 dark:text-blue-100">
-                {validatedFiles > 1 ? "🔬 Comprehensive Analysis" : "AI-Powered Analysis"}
+                {validatedFiles > 1 ? " Comprehensive Analysis" : "AI-Powered Analysis"}
               </h4>
               <p className="text-xs text-blue-700 dark:text-blue-300">
                 Your files will be analyzed using advanced medical AI. The system will provide preliminary insights that should be reviewed by a healthcare professional.
               </p>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 font-semibold">
-                ⚠️ This is not a substitute for professional medical advice, diagnosis, or treatment.
+                 This is not a substitute for professional medical advice, diagnosis, or treatment.
               </p>
             </div>
           </div>

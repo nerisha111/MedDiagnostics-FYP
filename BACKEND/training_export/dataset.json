@@ -1,0 +1,100 @@
+[
+  {
+    "id": "54c41c33-7079-43f1-b8fe-3ecf75d5b649",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "brain tumour"
+      }
+    ]
+  },
+  {
+    "id": "2ba49315-58cd-439a-9d7d-b0d3593f74aa",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "pneunomia"
+      }
+    ]
+  },
+  {
+    "id": "b3f70b75-e3c7-488c-b260-0808025491cb",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown"
+      }
+    ]
+  },
+  {
+    "id": "3278f041-a1b4-422f-89d9-cd6da05a3ec1",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown"
+      }
+    ]
+  },
+  {
+    "id": "79da3a80-8342-4384-88f6-84c51be63d24",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown"
+      }
+    ]
+  },
+  {
+    "id": "fd830242-1dde-4579-bcb4-e5757c2bed87",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown. Note: comments"
+      }
+    ]
+  },
+  {
+    "id": "bd722249-7089-4cc2-a979-371567f46bc3",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown. Note: fds"
+      }
+    ]
+  }
+]
