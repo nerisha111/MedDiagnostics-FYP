@@ -36,7 +36,6 @@ import {
   Image,
   FileText,
   FlaskConical,
-  Dna,
   X,
   CheckCircle2,
   AlertCircle,
@@ -84,7 +83,6 @@ interface AnalysisResult {
     category: string;
     action: string;
   }>;
-  // NEW: Track which data sources were analyzed
   dataSourcesAnalyzed?: {
     images: number;
     labResults: number;
@@ -100,26 +98,33 @@ export function HealthcareDataUpload() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [patientInfoOpen, setPatientInfoOpen] = useState(true);
+  
+  // Patient Information State
   const [patientId, setPatientId] = useState("PT-2024-" + Math.floor(Math.random() * 1000).toString().padStart(3, "0"));
   const [dob, setDob] = useState("");
   const [dobError, setDobError] = useState("");
   const [gender, setGender] = useState("");
   const [chiefComplaint, setChiefComplaint] = useState("");
   const [medicalHistory, setMedicalHistory] = useState("");
+  
+  // NEW: Genetic History State
+  const [geneticHistory, setGeneticHistory] = useState("");
+
   const [activeTab, setActiveTab] = useState("images");
   const [dragOver, setDragOver] = useState(false);
+  
+  // REMOVED: genetic array from files state
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({
     images: [],
     notes: [],
     labs: [],
-    genetic: [],
   });
 
+  // REMOVED: Genetic Data from uploadZones (Only 3 items remain)
   const uploadZones = [
     { id: "images", label: "Medical Images", icon: Image, formats: "JPG, JPEG, PNG, DICOM", maxSize: "100MB" },
     { id: "notes", label: "Clinical Notes", icon: FileText, formats: "PDF, DOC, DOCX, TXT", maxSize: "50MB" },
     { id: "labs", label: "Lab Results", icon: FlaskConical, formats: "PDF, CSV, Excel, TXT", maxSize: "50MB" },
-    { id: "genetic", label: "Genetic Data", icon: Dna, formats: "VCF, BAM, FASTQ, TXT, PDF", maxSize: "50MB" },
   ];
 
   const parseSize = (sizeStr: string): number => {
@@ -170,7 +175,7 @@ export function HealthcareDataUpload() {
   };
 
   // ============================================================================
-  // SINGLE FILE ANALYSIS (Original function - kept for backward compatibility)
+  // SINGLE FILE ANALYSIS
   // ============================================================================
   const analyzeWithAI = async (
     file: UploadedFile, 
@@ -261,7 +266,7 @@ export function HealthcareDataUpload() {
   };
 
   // ============================================================================
-  // NEW: MULTI-FILE COMBINED ANALYSIS
+  // MULTI-FILE COMBINED ANALYSIS
   // ============================================================================
   const analyzeMultipleFilesCombined = async (
     allFiles: Array<{ file: File; category: string; name: string }>,
@@ -347,34 +352,65 @@ export function HealthcareDataUpload() {
   }, [navigate]);
 
   // ============================================================================
-  // MAIN ANALYSIS HANDLER - UPDATED FOR MULTI-FILE SUPPORT
+  // MAIN ANALYSIS HANDLER
   // ============================================================================
   const handleProceedToAnalysis = async () => {
-    setIsSubmitting(true);
-    
-    try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error("Authentication error. Please log in again.");
-      }
+  setIsSubmitting(true);
+  
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      throw new Error("Authentication error. Please log in again.");
+    }
 
-      const token = session.access_token;
-      
-      // Step 1: Create diagnostic case in your backend
-      const caseData = {
-        status: "Pending Analysis",
-        description: `Chief Complaint: ${chiefComplaint}\n\nMedical History: ${medicalHistory}`,
-        profile_info: {
-          patient_id: patientId,
-          date_of_birth: dob,
-          gender: gender,
-        }
-      };
-      
-      const caseResponse = await axios.post('/api/cases/', caseData, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const caseId = caseResponse.data.id;
+    const token = session.access_token;
+    
+    // === CRITICAL FIX: Ensure we're sending actual values, not defaults ===
+    const actualChiefComplaint = chiefComplaint?.trim() || "";
+    const actualMedicalHistory = medicalHistory?.trim() || "";
+    const actualGeneticHistory = geneticHistory?.trim() || "";
+    
+
+    const descriptionParts = [];
+    if (actualChiefComplaint) {
+      descriptionParts.push(`Chief Complaint: ${actualChiefComplaint}`);
+    }
+    if (actualMedicalHistory) {
+      descriptionParts.push(`Medical History: ${actualMedicalHistory}`);
+    }
+    if (actualGeneticHistory) {
+      descriptionParts.push(`Genetic History: ${actualGeneticHistory}`);
+    }
+    
+    const fullDescription = descriptionParts.length > 0 
+      ? descriptionParts.join('\n\n')
+      : null; 
+    
+    const caseData = {
+      status: "Pending Analysis",
+      chief_complaint: actualChiefComplaint || null,  
+      description: fullDescription,
+      profile_info: {
+        patient_id: patientId,
+        date_of_birth: dob,
+        gender: gender,
+        ...(actualChiefComplaint && { chief_complaint: actualChiefComplaint }),
+        ...(actualMedicalHistory && { medical_history: actualMedicalHistory }),
+        ...(actualGeneticHistory && { genetic_history: actualGeneticHistory })
+      }
+    };
+    
+    console.log(" Creating case with data:", caseData);
+    
+    const caseResponse = await axios.post('/api/cases/', caseData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const caseId = caseResponse.data.id;
+    
+    console.log(" Case created successfully:", caseResponse.data);
+    toast.success("Diagnostic case created successfully!");
+    
+    
       
       // Step 2: Save all uploaded files to your backend
       const allFilesData = Object.entries(files).flatMap(([category, fileArray]) => 
@@ -424,21 +460,22 @@ export function HealthcareDataUpload() {
       // ========================================================================
       // STEP 4: PREPARE PATIENT CONTEXT FOR AI
       // ========================================================================
+      // MODIFIED: Included Genetic History in AI Context
       const patientContext = [
         chiefComplaint && `Chief Complaint: ${chiefComplaint}`,
         medicalHistory && `Medical History: ${medicalHistory}`,
+        geneticHistory && `Genetic History: ${geneticHistory}`,
         gender && `Gender: ${gender}`,
         dob && `Date of Birth: ${dob}`,
         patientId && `Patient ID: ${patientId}`
       ].filter(Boolean).join('\n\n');
 
       // ========================================================================
-      // STEP 5: DECIDE ANALYSIS STRATEGY (MULTI-FILE vs SINGLE-FILE)
+      // STEP 5: DECIDE ANALYSIS STRATEGY
       // ========================================================================
       try {
         let aiResult: AnalysisResult;
         
-        // *** NEW LOGIC: Use combined analysis if multiple files ***
         if (allFilesForAnalysis.length > 1) {
           // MULTI-FILE COMBINED ANALYSIS
           toast.info("🔬 Performing comprehensive multi-modal analysis...", {
@@ -465,7 +502,7 @@ export function HealthcareDataUpload() {
           }
           
         } else {
-          // SINGLE FILE ANALYSIS (fallback to original logic)
+          // SINGLE FILE ANALYSIS
           const fileForAnalysis = allFilesForAnalysis[0];
           const analysisType = getFileAnalysisType(
             { ...fileForAnalysis, size: fileForAnalysis.file.size, progress: 100, status: 'success' as const },
@@ -491,7 +528,6 @@ export function HealthcareDataUpload() {
         navigate('/healthcare/results', { 
           state: { 
             result: aiResult,
-            // Pass additional context for the results page
             metadata: {
               filesAnalyzed: allFilesForAnalysis.length,
               patientId: patientId,
@@ -647,7 +683,8 @@ export function HealthcareDataUpload() {
   };
   
   const clearAll = () => {
-    setFiles({ images: [], notes: [], labs: [], genetic: [] });
+    // REMOVED: genetic
+    setFiles({ images: [], notes: [], labs: [] });
     toast.info("All files cleared");
   };
 
@@ -767,15 +804,28 @@ export function HealthcareDataUpload() {
                   rows={2}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="history">Medical History</Label>
-                <Textarea 
-                  id="history" 
-                  value={medicalHistory} 
-                  onChange={(e) => setMedicalHistory(e.target.value)} 
-                  placeholder="Relevant medical history, medications, allergies..." 
-                  rows={3}
-                />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="history">Medical History</Label>
+                  <Textarea 
+                    id="history" 
+                    value={medicalHistory} 
+                    onChange={(e) => setMedicalHistory(e.target.value)} 
+                    placeholder="Relevant medical history, medications, allergies..." 
+                    rows={3}
+                  />
+                </div>
+                {/* NEW FIELD: Genetic History */}
+                <div className="space-y-2">
+                  <Label htmlFor="geneticHistory">Genetic History</Label>
+                  <Textarea 
+                    id="geneticHistory" 
+                    value={geneticHistory} 
+                    onChange={(e) => setGeneticHistory(e.target.value)} 
+                    placeholder="Family history of genetic disorders, carrier status..." 
+                    rows={3}
+                  />
+                </div>
               </div>
             </div>
           </CollapsibleContent>
@@ -788,7 +838,8 @@ export function HealthcareDataUpload() {
           <Card className="p-4 sm:p-6">
             <h3 className="font-semibold mb-4">Upload Medical Data</h3>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 md:grid-cols-4 h-auto">
+              {/* MODIFIED: Added w-full and grid-cols-3 to spread tabs evenly */}
+              <TabsList className="w-full grid grid-cols-3 h-auto">
                 {uploadZones.map((zone) => {
                   const Icon = zone.icon;
                   const count = files[zone.id].length;
@@ -1032,7 +1083,7 @@ export function HealthcareDataUpload() {
         </div>
       </Card>
 
-      {/* Info Card about AI Analysis - UPDATED FOR MULTI-FILE */}
+      {/* Info Card about AI Analysis */}
       {validatedFiles > 0 && !hasErrors && (
         <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
           <div className="flex gap-3">
@@ -1067,7 +1118,7 @@ export function HealthcareDataUpload() {
                   </ul>
                   
                   <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-xs">
-                    <strong>📊 Your Data:</strong>
+                    <strong> Your Data:</strong>
                     {Object.entries(files).map(([category, fileArray]) => {
                       const count = fileArray.filter(f => f.status === 'success').length;
                       if (count === 0) return null;
@@ -1075,7 +1126,6 @@ export function HealthcareDataUpload() {
                         images: 'Medical Images',
                         labs: 'Lab Results',
                         notes: 'Clinical Notes',
-                        genetic: 'Genetic Data'
                       }[category] || category;
                       return (
                         <span key={category} className="inline-block mr-3 text-blue-800 dark:text-blue-200">

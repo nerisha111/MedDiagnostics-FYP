@@ -444,7 +444,17 @@ class DiagnosticCaseListCreateAPIView(generics.ListCreateAPIView):
         return Diagnosticcase.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        
+        logger.info(f"=== CREATING DIAGNOSTIC CASE ===")
+        logger.info(f"User: {self.request.user.email}")
+        logger.info(f"Data received: {self.request.data}")
+        
+        instance = serializer.save(user=self.request.user)
+          
+        logger.info(f"Case created with ID: {instance.id}")
+        logger.info(f"Chief Complaint saved: {instance.chief_complaint}")
+        logger.info(f"Description saved: {instance.description}")
+        logger.info(f"Profile Info saved: {instance.profile_info}")
 
 class DiagnosticCaseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
    
@@ -984,109 +994,182 @@ class PatientReportDetailAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    def extract_chief_complaint(self, case_obj):
+        """Extract chief complaint with multiple fallback strategies"""
+        # FIXED: More precise bad values check
+        bad_values = {
+            'not specified', 
+            'null', 
+            'none', 
+            '', 
+            'no description recorded', 
+            'no description recorded.',
+            'general consultation'
+        }
+      
+        # 1. PRIORITY: Check chief_complaint field directly (most reliable)
+        if hasattr(case_obj, 'chief_complaint') and case_obj.chief_complaint:
+            value = str(case_obj.chief_complaint).strip()
+            if value and value.lower() not in bad_values:
+                logger.info(f"✓ Chief complaint from field: {value[:50]}...")
+                return value
+        
+        # 2. Check profile_info JSON for chief_complaint
+        if case_obj.profile_info and isinstance(case_obj.profile_info, dict):
+            # Try chief_complaint first
+            if 'chief_complaint' in case_obj.profile_info:
+                value = str(case_obj.profile_info['chief_complaint']).strip()
+                if value and value.lower() not in bad_values:
+                    logger.info(f"✓ Chief complaint from profile_info.chief_complaint: {value[:50]}...")
+                    return value
+            
+            # Then try complaint
+            if 'complaint' in case_obj.profile_info:
+                value = str(case_obj.profile_info['complaint']).strip()
+                if value and value.lower() not in bad_values:
+                    logger.info(f"✓ Chief complaint from profile_info.complaint: {value[:50]}...")
+                    return value
+            
+            # Then try symptoms
+            if 'symptoms' in case_obj.profile_info:
+                symptoms = case_obj.profile_info['symptoms']
+                if isinstance(symptoms, list) and symptoms:
+                    # Join symptoms list
+                    value = ', '.join(str(s) for s in symptoms if s)
+                    if value and value.lower() not in bad_values:
+                        logger.info(f"✓ Chief complaint from profile_info.symptoms: {value[:50]}...")
+                        return value
+                elif isinstance(symptoms, str):
+                    value = symptoms.strip()
+                    if value and value.lower() not in bad_values:
+                        logger.info(f"✓ Chief complaint from profile_info.symptoms: {value[:50]}...")
+                        return value
+        
+        # 3. Check description field (parse for "Chief Complaint:" line)
+        if case_obj.description:
+            desc = case_obj.description.strip()
+            if desc and desc.lower() not in bad_values:
+                # Try to extract from "Chief Complaint:" line
+                lines = desc.split('\n')
+                for line in lines:
+                    if 'chief complaint:' in line.lower():
+                        # Extract text after "Chief Complaint:"
+                        parts = line.split(':', 1)
+                        if len(parts) > 1:
+                            complaint = parts[1].strip()
+                            if complaint and complaint.lower() not in bad_values:
+                                logger.info(f"✓ Chief complaint from description line: {complaint[:50]}...")
+                                return complaint
+                
+                # If no "Chief Complaint:" line found, use first non-empty line
+                for line in lines:
+                    line = line.strip()
+                    if line and line.lower() not in bad_values:
+                        # Skip common headers
+                        if not any(header in line.lower() for header in ['medical history:', 'genetic history:', 'patient id:']):
+                            logger.info(f"✓ Chief complaint from first description line: {line[:50]}...")
+                            return line
+        
+        # 4. Last resort: Check inputs
+        if hasattr(case_obj, 'inputs'):
+            for input_obj in case_obj.inputs.all():
+                if input_obj.description:
+                    value = str(input_obj.description).strip()
+                    if value and value.lower() not in bad_values:
+                        logger.info(f"✓ Chief complaint from input: {value[:50]}...")
+                        return value
+        
+        # 5. If all else fails
+        logger.warning(f"✗ No valid chief complaint found for case {case_obj.id}")
+        logger.warning(f"   chief_complaint field: {getattr(case_obj, 'chief_complaint', 'N/A')}")
+        logger.warning(f"   profile_info: {case_obj.profile_info}")
+        logger.warning(f"   description: {case_obj.description[:100] if case_obj.description else 'N/A'}")
+        return "No chief complaint recorded."
+    
     def get(self, request, diagnosis_id, *args, **kwargs):
         try:
-            # Verify user is authenticated
             if not request.user or not request.user.is_authenticated:
                 return Response(
                     {'error': 'Authentication required'},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            logger.info(f"User {request.user.email} requesting diagnosis {diagnosis_id}")
-            
-            
+            # Fetch diagnosis with related data
             diagnosis = Diagnosis.objects.select_related(
                 'diagnostic_case__user'
             ).prefetch_related(
+                'diagnostic_case__inputs',  
                 'recommendations'
             ).get(id=diagnosis_id)
             
-            
+            # Security check
             if diagnosis.diagnostic_case.user.id != request.user.id:
-                logger.warning(
-                    f"Unauthorized access attempt: User {request.user.email} (ID: {request.user.id}) "
-                    f"tried to access diagnosis {diagnosis_id} belonging to user {diagnosis.diagnostic_case.user.email} "
-                    f"(ID: {diagnosis.diagnostic_case.user.id})"
-                )
                 return Response(
                     {'error': 'You do not have permission to view this report'},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            logger.info(f"Access granted for user {request.user.email} to diagnosis {diagnosis_id}")
-            
-            # Get case inputs for data sources
             case = diagnosis.diagnostic_case
+            complaint_text = self.extract_chief_complaint(case)
+            
+           
             inputs = case.inputs.all()
+            data_sources = list(set([inp.input_type for inp in inputs if inp.input_type]))
             
-            data_sources = []
-            for input_obj in inputs:
-                if input_obj.input_type:
-                    data_sources.append(input_obj.input_type)
             
-            # Get recommendations
             recommendations = diagnosis.recommendations.all()
-            next_steps = []
-            
-            for rec in recommendations:
-                next_steps.append({
+            next_steps = [
+                {
                     'category': rec.category or rec.type or 'General',
                     'action': rec.name or rec.description or 'No description'
-                })
+                }
+                for rec in recommendations
+            ]
             
             # Build response
             report_detail = {
                 'id': str(diagnosis.id),
                 'case_id': str(case.id),
                 'diagnosis': diagnosis.name,
+                'chief_complaint': complaint_text,
                 'confidence': int(diagnosis.confidence) if diagnosis.confidence else 0,
                 'date': diagnosis.diagnosis_date.strftime('%Y-%m-%d') if diagnosis.diagnosis_date else case.created_at.strftime('%Y-%m-%d'),
                 'description': diagnosis.clinician_comment or 'No description available',
                 'status': 'reviewed' if diagnosis.is_reviewed else 'complete',
-                'dataSources': list(set(data_sources)),
+                'dataSources': data_sources,
                 'findings': self._extract_findings(diagnosis.clinician_comment),
-                'nextSteps': next_steps if next_steps else [
+                'nextSteps': next_steps or [
                     {
                         'category': 'Follow-up',
-                        'action': 'Consult with your healthcare provider to discuss treatment options'
-                    },
-                    {
-                        'category': 'Lifestyle',
-                        'action': 'Adopt dietary changes and increase physical activity'
+                        'action': 'Consult with your healthcare provider'
                     }
                 ],
                 'profile_info': case.profile_info or {}
             }
             
+            logger.info(f"✓ Returning report detail for diagnosis {diagnosis_id}")
+            logger.info(f"  Chief complaint: {complaint_text[:50]}...")
             return Response(report_detail, status=status.HTTP_200_OK)
             
         except Diagnosis.DoesNotExist:
-            logger.error(f"Diagnosis {diagnosis_id} not found")
-            return Response(
-                {'error': 'Report not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({'error': 'Report not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error fetching report detail: {str(e)}", exc_info=True)
+            logger.error(f"✗ Error fetching report detail: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'An error occurred: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def _extract_findings(self, description):
-        """
-        Extract key findings from description text.
-        """
+        """Extract findings from clinician comments"""
         if not description:
-            return [
-                "Detailed findings documented in comprehensive clinical assessment"
-            ]
+            return ["Detailed findings documented in comprehensive clinical assessment"]
         
+       
         sentences = [s.strip() for s in description.replace('\n', '. ').split('.') if s.strip()]
-        findings = sentences[:5] if sentences else ["No specific findings documented"]
         
-        return findings
+      
+        return sentences[:5] if sentences else ["No specific findings documented"]
 
 class PatientActivityHistoryAPIView(APIView):
     """
@@ -1215,5 +1298,116 @@ class PatientActivityStatsAPIView(APIView):
             logger.error(f"Error fetching patient activity stats: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'An error occurred: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class SaveDiagnosisWithRecommendationsAPIView(APIView):
+    """
+    Saves a complete diagnosis with its recommendations to the database.
+    This should be called AFTER the AI diagnosis is generated.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Expected request.data format:
+        {
+            "case_id": "uuid-of-diagnostic-case",
+            "diagnosis": {
+                "name": "Pneumonia",
+                "confidence": 85,
+                "description": "AI analysis details..."
+            },
+            "recommendations": [
+                {
+                    "name": "Chest X-Ray",
+                    "category": "Imaging Test",
+                    "type": "Test",
+                    "description": "To confirm diagnosis"
+                },
+                {
+                    "name": "Antibiotics",
+                    "category": "Treatment",
+                    "type": "Medication",
+                    "description": "Broad spectrum"
+                }
+            ]
+        }
+        """
+        try:
+            case_id = request.data.get('case_id')
+            diagnosis_data = request.data.get('diagnosis', {})
+            recommendations_data = request.data.get('recommendations', [])
+
+            if not case_id:
+                return Response(
+                    {'error': 'case_id is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Verify the case exists and belongs to the user
+            try:
+                diagnostic_case = Diagnosticcase.objects.get(
+                    id=case_id,
+                    user=request.user
+                )
+            except Diagnosticcase.DoesNotExist:
+                return Response(
+                    {'error': 'Diagnostic case not found or access denied'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            
+            with transaction.atomic():
+                # Create the Diagnosis
+                diagnosis = Diagnosis.objects.create(
+                    diagnostic_case=diagnostic_case,
+                    name=diagnosis_data.get('name', 'Unknown'),
+                    confidence=diagnosis_data.get('confidence', 0),
+                    clinician_comment=diagnosis_data.get('description', ''),
+                    model_used="LLava-Med",  
+                    is_reviewed=False
+                )
+
+                logger.info(f" Created Diagnosis: {diagnosis.id} for case {case_id}")
+
+                # Create all Recommendations
+                created_recommendations = []
+                for rec_data in recommendations_data:
+                    # Skip empty or invalid recommendations
+                    if not rec_data.get('name') or rec_data.get('name').strip() == '':
+                        continue
+                    
+                    if 'NOT NULL' in rec_data.get('name', ''):
+                        continue
+
+                    recommendation = Recommendation.objects.create(
+                        diagnosis=diagnosis,
+                        name=rec_data.get('name', '').strip(),
+                        category=rec_data.get('category', 'General'),
+                        type=rec_data.get('type', 'Plan'),
+                        description=rec_data.get('description', ''),
+                        is_reviewed=False
+                    )
+                    created_recommendations.append(recommendation)
+                    logger.info(f"   Created Recommendation: {recommendation.name}")
+
+                logger.info(f" Saved {len(created_recommendations)} recommendations for diagnosis {diagnosis.id}")
+
+                # Return the complete saved data
+                response_data = {
+                    'diagnosis_id': str(diagnosis.id),
+                    'case_id': str(diagnostic_case.id),
+                    'diagnosis_name': diagnosis.name,
+                    'confidence': diagnosis.confidence,
+                    'recommendations_count': len(created_recommendations),
+                    'message': 'Diagnosis and recommendations saved successfully'
+                }
+
+                return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f" Error saving diagnosis: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to save diagnosis: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

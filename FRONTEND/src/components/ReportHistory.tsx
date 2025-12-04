@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 // Icons
 import {
   Search, Filter, Eye, Download, Trash2, MoreVertical, ChevronDown,
-  Activity, AlertCircle, FlaskConical, Pill, XCircle
+  Activity, AlertCircle, FlaskConical, Pill, XCircle, Calendar
 } from "lucide-react";
 
 // PDF Imports
@@ -33,16 +33,21 @@ interface Report {
   confidence: number;
 }
 
+// Updated Recommendation Interface to match Feedback System
 interface Recommendation {
-  name: string | null;
-  type?: string;
-  category?: string;
+  id: string;
+  name: string;
+  category: string | null;
+  type: string | null;
+  description: string | null;
 }
 
+// Updated DiagnosisDetailResponse to include chief_complaint
 interface DiagnosisDetailResponse {
   id: string;
   diagnostic_case: {
     description: string;
+    chief_complaint?: string;
   };
   name: string;
   confidence: number;
@@ -742,227 +747,208 @@ export function ReportHistory() {
 
       {/* View Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-             {/* Fixed accessibility structure */}
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>View Details</DialogTitle>
             <DialogDescription>A summary of the AI's diagnostic analysis.</DialogDescription>
           </DialogHeader>
           
-          {isModalLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Activity className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            selectedDiagnosis && (
-              <div className="grid gap-6 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Chief Complaint</label>
-                    <p className="text-base p-4 bg-muted/50 rounded-lg border">{selectedDiagnosis.diagnostic_case?.description || "No description recorded."}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Primary Diagnosis</label>
-                    <p className="font-semibold text-lg">{selectedDiagnosis.name || "Pending Analysis"}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">AI Confidence</label>
-                    <p className="font-bold text-xl text-primary">{selectedDiagnosis.confidence}%</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
-                    <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
-    {selectedDiagnosis.recommendations
-      // Filter: Check if type is 'Test' OR if the category implies a test (fallback)
-      .filter(r => {
-        const text = r.name || "";
-        const type = r.type || "";
-        const category = r.category || "";
-        return (
-          text.trim() !== "" && 
-          !text.includes("NOT NULL") &&
-          (type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging"))
-        );
-      })
-      .length > 0 ? (
-        selectedDiagnosis.recommendations
-          .filter(r => {
-             const text = r.name || "";
-             const type = r.type || "";
-             const category = r.category || "";
-             return (
-               text.trim() !== "" && 
-               !text.includes("NOT NULL") &&
-               (type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging"))
-             );
-          })
-          .map((test, index) => (
-            <Badge key={index} variant="secondary" className="text-sm">
-              <FlaskConical className="w-3 h-3 mr-1.5" />
-              {test.name}
-            </Badge>
-          ))
-    ) : (
-      <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
-    )}
-  </div>
-                  </div>
+          <div className="flex-1 overflow-y-auto pr-2">
+            {isModalLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Activity className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              selectedDiagnosis && (
+                <div className="grid gap-6 py-4">
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Chief Complaint</label>
+                      <p className="text-base p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                          const badValues = ['not specified', 'null', 'none', '', 'general consultation', 'no description recorded', 'no description recorded.'];
+                          
+                          // Priority 1: Check chief_complaint from diagnostic_case
+                          if (selectedDiagnosis.diagnostic_case?.chief_complaint) {
+                            const complaint = String(selectedDiagnosis.diagnostic_case.chief_complaint).trim();
+                            if (complaint && !badValues.includes(complaint.toLowerCase())) {
+                              return complaint;
+                            }
+                          }
+                          
+                          // Priority 2: Check description from diagnostic_case
+                          if (selectedDiagnosis.diagnostic_case?.description) {
+                            const desc = String(selectedDiagnosis.diagnostic_case.description).trim();
+                            if (desc && !badValues.includes(desc.toLowerCase())) {
+                              return desc;
+                            }
+                          }
+                          
+                          // Fallback
+                          return "No chief complaint recorded.";
+                        })()}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Primary Diagnosis</label>
+                      <p className="font-semibold text-lg">{selectedDiagnosis.name || "Pending Analysis"}</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">AI Confidence</label>
+                      <p className="font-bold text-xl text-primary">{selectedDiagnosis.confidence}%</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
+                      <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                          const tests = selectedDiagnosis.recommendations.filter(r => {
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            return (
+                              categoryLower.includes('diagnostic') ||
+                              categoryLower.includes('imaging') ||
+                              categoryLower.includes('cardiac monitoring') ||
+                              typeLower === 'test' ||
+                              categoryLower === 'imaging test'
+                            );
+                          });
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
-                    <div className="p-4 bg-muted/50 rounded-lg border flex flex-wrap gap-2">
-    {selectedDiagnosis.recommendations
-      // Filter: Anything that is NOT a test is a treatment
-      .filter(r => {
-        const text = r.name || "";
-        const type = r.type || "";
-        const category = r.category || "";
-        const isTest = type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging");
-        
-        return (
-          text.trim() !== "" && 
-          !text.includes("NOT NULL") && 
-          !isTest 
-        );
-      })
-      .length > 0 ? (
-        selectedDiagnosis.recommendations
-          .filter(r => {
-            const text = r.name || "";
-            const type = r.type || "";
-            const category = r.category || "";
-            const isTest = type === "Test" || category.toLowerCase().includes("test") || category.toLowerCase().includes("imaging");
-            
-            return (
-              text.trim() !== "" && 
-              !text.includes("NOT NULL") && 
-              !isTest 
-            );
-          })
-          .map((treatment, index) => (
-            <Badge key={index} variant="outline" className="text-sm">
-              <Pill className="w-3 h-3 mr-1.5" />
-              {treatment.name}
-            </Badge>
-          ))
-    ) : (
-      <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
-    )}
-  </div>
+                          return tests.length > 0 ? (
+                            <div className="space-y-2">
+                              {tests.map((test, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                  <FlaskConical className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">{test.name}</p>
+                                    {test.description && <p className="text-xs text-muted-foreground mt-1">{test.description}</p>}
+                                    <div className="flex gap-2 mt-1">
+                                      <Badge variant="secondary" className="text-xs">{test.category}</Badge>
+                                      {test.type && <Badge variant="outline" className="text-xs">{test.type}</Badge>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
+                      <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                          const treatments = selectedDiagnosis.recommendations.filter(r => {
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            return (
+                              categoryLower === 'treatment' ||
+                              categoryLower.includes('medication') ||
+                              categoryLower.includes('therapeutic') ||
+                              categoryLower.includes('supportive care') ||
+                              typeLower === 'treatment'
+                            );
+                          });
+
+                          return treatments.length > 0 ? (
+                            <div className="space-y-2">
+                              {treatments.map((treatment, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                  <Pill className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">{treatment.name}</p>
+                                    {treatment.description && <p className="text-xs text-muted-foreground mt-1">{treatment.description}</p>}
+                                    <div className="flex gap-2 mt-1">
+                                      <Badge variant="secondary" className="text-xs">{treatment.category}</Badge>
+                                      {treatment.type && <Badge variant="outline" className="text-xs">{treatment.type}</Badge>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">General Recommendations</label>
+                      <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                          const generalRecs = selectedDiagnosis.recommendations.filter(r => {
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            return (
+                              categoryLower === 'general' ||
+                              typeLower === 'plan' ||
+                              (!categoryLower.includes('diagnostic') && 
+                              !categoryLower.includes('imaging') && 
+                              !categoryLower.includes('treatment') &&
+                              typeLower !== 'test')
+                            );
+                          });
+
+                          return generalRecs.length > 0 ? (
+                            <div className="space-y-2">
+                              {generalRecs.map((rec, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                  <Calendar className="w-4 h-4 mt-0.5 text-purple-500 flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <p className="text-sm">{rec.name}</p>
+                                    {rec.description && <p className="text-xs text-muted-foreground mt-1">{rec.description}</p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
                   </div>
-                </div>
-            )
-          )}
+              )
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Single Delete Confirmation Dialog */}
+      {/* Delete Dialogs */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <XCircle className="w-5 h-5" />
-              Delete Report
-            </DialogTitle>
-             <DialogDescription>
-               This action will permanently remove the selected diagnostic report from the database.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-red-600"><XCircle className="w-5 h-5" /> Delete Report</DialogTitle>
+             <DialogDescription>This action will permanently remove the selected diagnostic report from the database.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to delete report{" "}
-              <span className="font-mono font-semibold text-gray-900">
-                {reportToDelete?.id}
-              </span>
-              ?
-            </p>
-            <p className="text-sm text-red-600 mt-2 font-medium">
-              This action cannot be undone.
-            </p>
+            <p className="text-sm text-gray-600">Are you sure you want to delete report <span className="font-mono font-semibold text-gray-900">{reportToDelete?.id}</span>?</p>
+            <p className="text-sm text-red-600 mt-2 font-medium">This action cannot be undone.</p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false);
-                setReportToDelete(null);
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={isDeleting}
-              className="gap-2"
-            >
-              {isDeleting ? (
-                <>
-                  <Activity className="w-4 h-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4" />
-                  Delete Report
-                </>
-              )}
-            </Button>
+            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setReportToDelete(null); }} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting} className="gap-2">{isDeleting ? <><Activity className="w-4 h-4 animate-spin" /> Deleting...</> : <><Trash2 className="w-4 h-4" /> Delete Report</>}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <XCircle className="w-5 h-5" />
-              Delete Multiple Reports
-            </DialogTitle>
-            <DialogDescription>
-              This action will permanently remove the selected reports.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-red-600"><XCircle className="w-5 h-5" /> Delete Multiple Reports</DialogTitle>
+            <DialogDescription>This action will permanently remove the selected reports.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-gray-900">
-                {selectedReports.length} reports
-              </span>
-              ?
-            </p>
-            <p className="text-sm text-red-600 mt-2 font-medium">
-              This action cannot be undone.
-            </p>
+            <p className="text-sm text-gray-600">Are you sure you want to delete <span className="font-semibold text-gray-900">{selectedReports.length} reports</span>?</p>
+            <p className="text-sm text-red-600 mt-2 font-medium">This action cannot be undone.</p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setBulkDeleteDialogOpen(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmBulkDelete}
-              disabled={isDeleting}
-              className="gap-2"
-            >
-              {isDeleting ? (
-                <>
-                  <Activity className="w-4 h-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4" />
-                  Delete {selectedReports.length} Reports
-                </>
-              )}
-            </Button>
+            <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmBulkDelete} disabled={isDeleting} className="gap-2">{isDeleting ? <><Activity className="w-4 h-4 animate-spin" /> Deleting...</> : <><Trash2 className="w-4 h-4" /> Delete {selectedReports.length} Reports</>}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -84,6 +84,7 @@ urlpatterns = [
     path('diagnoses/', views.DiagnosisListCreateAPIView.as_view(), name='diagnosis-list-create'),
     path('diagnoses/with-feedback/', DiagnosisFeedbackListAPIView.as_view(), name='diagnosis-feedback-list'),
     path('diagnoses/<uuid:pk>/', DiagnosisDetailAPIView.as_view(), name='diagnosis-detail'),
+    path('diagnoses/save-complete/', views.SaveDiagnosisWithRecommendationsAPIView.as_view(), name='save-complete-diagnosis'),
     
     # ==================================================================================
     # RECOMMENDATIONS

@@ -54,12 +54,14 @@ class ClinicianSerializer(serializers.ModelSerializer):
 
 class DiagnosticCaseSerializer(serializers.ModelSerializer):
     created_by_email = serializers.StringRelatedField(source='user')
+    
     class Meta:
         model = Diagnosticcase
         fields = [
-            'id', 'status', 'description', 'created_at',
-            'user', 'created_by_email', 'profile_info'
+            'id', 'status', 'description', 'chief_complaint', 
+            'created_at', 'user', 'created_by_email', 'profile_info'
         ]
+        read_only_fields = ['id', 'created_at', 'created_by_email']
 
 class DiagnosticInputSerializer(serializers.ModelSerializer):
     class Meta:
@@ -86,46 +88,32 @@ class DiagnosisSerializer(serializers.ModelSerializer):
             'model_used', 'model_details'
        ]
 
+
+
 class DiagnosticCaseSummarySerializer(serializers.ModelSerializer):
     """ 
-    A simple serializer to embed in the diagnosis detail view. 
-    Includes robust logic to fetch description from inputs.
+    Smart serializer: Checks 'chief_complaint' column first.
+    If empty, grabs the 'description' column.
     """
-    description = serializers.SerializerMethodField()
+    chief_complaint = serializers.SerializerMethodField()
 
     class Meta:
         model = Diagnosticcase
-        fields = ['id', 'description', 'profile_info', 'created_at']
+        fields = ['id', 'description', 'chief_complaint', 'profile_info', 'created_at']
 
-    def get_description(self, obj):
+    def get_chief_complaint(self, obj):
         
-        print(f"DEBUG: Fetching description for Case ID: {obj.id}")
-        print(f"DEBUG: Case Description (Raw): '{obj.description}'")
-        
-    
-        if obj.description and str(obj.description).strip() and str(obj.description).upper() != 'NULL':
-            return obj.description
-
-       
-        if obj.profile_info and isinstance(obj.profile_info, dict):
-            print(f"DEBUG: Checking profile_info: {obj.profile_info}")
+        if obj.chief_complaint and str(obj.chief_complaint).strip() not in ['Not Specified', 'NULL', 'None']:
+            return obj.chief_complaint
             
-            for key in ['description', 'symptoms', 'chief_complaint', 'complaint']:
-                val = obj.profile_info.get(key)
-                if val and str(val).strip():
-                     return str(val)
+      
+        if obj.description:
+            return obj.description
+            
+        return "No chief complaint recorded."
 
-        
-        if hasattr(obj, 'inputs'):
-            inputs = obj.inputs.all()
-            print(f"DEBUG: Found {len(inputs)} inputs.")
-            for inp in inputs:
-                print(f"DEBUG: Input Description: '{inp.description}'")
-                if inp.description and str(inp.description).strip() and str(inp.description).upper() != 'NULL':
-                    return inp.description
-        
-        print("DEBUG: No description found. Returning default.")
-        return "No description recorded."
+
+ 
 
 class RecommendationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -284,20 +272,39 @@ class DiagnosisWithFeedbackSerializer(serializers.ModelSerializer):
         return final_dict
 
 class RecommendationDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for recommendations with all relevant fields.
+    Note: recommended_text is deprecated and contains 'NOT NULL' placeholder.
+    """
     class Meta:
         model = Recommendation
-        fields = '__all__' 
-
+        fields = [
+            'id', 
+            'name',        
+            'category',    
+            'type',        
+            'description', 
+            'generated_date', 
+            'is_reviewed'
+        ]
 class DiagnosisDetailSerializer(serializers.ModelSerializer):
+    """
+    The main serializer used for the 'View Details' modal.
+    Includes the nested diagnostic_case with the chief_complaint.
+    """
     recommendations = RecommendationDetailSerializer(many=True, read_only=True)
     diagnostic_case = DiagnosticCaseSummarySerializer(read_only=True)
 
     class Meta:
         model = Diagnosis
         fields = [
-            'id', 'diagnostic_case', 'name',
-            'diagnosis_date', 'confidence',
-            'clinician_comment', 'recommendations' 
+            'id', 
+            'diagnostic_case', 
+            'name',
+            'diagnosis_date', 
+            'confidence',
+            'clinician_comment', 
+            'recommendations' 
         ]
 
 class CaseComparisonListSerializer(serializers.ModelSerializer):

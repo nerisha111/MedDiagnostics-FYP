@@ -117,6 +117,7 @@ class Diagnosticcase(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     status = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    chief_complaint = models.TextField(blank=True, null=True)  # Make sure this exists
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey(User, models.SET_NULL, db_column='user_id', blank=True, null=True)
     profile_info = models.JSONField(blank=True, null=True)
