@@ -54,6 +54,7 @@ interface Report {
 }
 
 interface ReportDetail extends Report {
+  
   findings: string[];
   nextSteps: Array<{
     category: string;
@@ -173,6 +174,8 @@ export function PatientMyReports() {
       
       yPos += 35;
       
+     
+
       // Primary Diagnosis
       pdf.setFillColor(240, 248, 255);
       pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
@@ -655,6 +658,10 @@ export function PatientMyReports() {
                 </DialogHeader>
 
                 <div className="space-y-6 mt-4">
+                  
+                  
+                  
+
                   <div>
                     <h3 className="mb-3 font-semibold">Diagnosis</h3>
                     <Card className="p-4 bg-primary/5">

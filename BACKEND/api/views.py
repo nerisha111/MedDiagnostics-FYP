@@ -1,5 +1,6 @@
 # api/views.py
 
+import re
 import uuid
 from rest_framework import generics
 from rest_framework import status
@@ -988,6 +989,10 @@ class PatientReportsListAPIView(APIView):
         return list(sources) if sources else ['notes']
 
 
+# In api/views.py
+
+# In api/views.py
+
 class PatientReportDetailAPIView(APIView):
     """
     Get detailed information for a specific report/diagnosis.
@@ -995,97 +1000,63 @@ class PatientReportDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
     
     def extract_chief_complaint(self, case_obj):
-        """Extract chief complaint with multiple fallback strategies"""
-        # FIXED: More precise bad values check
-        bad_values = {
-            'not specified', 
-            'null', 
-            'none', 
-            '', 
-            'no description recorded', 
-            'no description recorded.',
-            'general consultation'
-        }
-      
-        # 1. PRIORITY: Check chief_complaint field directly (most reliable)
+        """
+        Permissive extraction: 
+        1. Checks 'chief_complaint' column.
+        2. Checks 'description' column (and attempts to clean it, but returns it regardless).
+        3. Checks Inputs.
+        """
+        bad_values = ['not specified', 'null', 'none', '', 'no description recorded', 'general consultation']
+
+        # --- 1. Check the specific 'chief_complaint' DB column ---
         if hasattr(case_obj, 'chief_complaint') and case_obj.chief_complaint:
-            value = str(case_obj.chief_complaint).strip()
-            if value and value.lower() not in bad_values:
-                logger.info(f"✓ Chief complaint from field: {value[:50]}...")
-                return value
+            val = str(case_obj.chief_complaint).strip()
+            if val and val.lower() not in bad_values:
+                return val
         
-        # 2. Check profile_info JSON for chief_complaint
-        if case_obj.profile_info and isinstance(case_obj.profile_info, dict):
-            # Try chief_complaint first
-            if 'chief_complaint' in case_obj.profile_info:
-                value = str(case_obj.profile_info['chief_complaint']).strip()
-                if value and value.lower() not in bad_values:
-                    logger.info(f"✓ Chief complaint from profile_info.chief_complaint: {value[:50]}...")
-                    return value
-            
-            # Then try complaint
-            if 'complaint' in case_obj.profile_info:
-                value = str(case_obj.profile_info['complaint']).strip()
-                if value and value.lower() not in bad_values:
-                    logger.info(f"✓ Chief complaint from profile_info.complaint: {value[:50]}...")
-                    return value
-            
-            # Then try symptoms
-            if 'symptoms' in case_obj.profile_info:
-                symptoms = case_obj.profile_info['symptoms']
-                if isinstance(symptoms, list) and symptoms:
-                    # Join symptoms list
-                    value = ', '.join(str(s) for s in symptoms if s)
-                    if value and value.lower() not in bad_values:
-                        logger.info(f"✓ Chief complaint from profile_info.symptoms: {value[:50]}...")
-                        return value
-                elif isinstance(symptoms, str):
-                    value = symptoms.strip()
-                    if value and value.lower() not in bad_values:
-                        logger.info(f"✓ Chief complaint from profile_info.symptoms: {value[:50]}...")
-                        return value
-        
-        # 3. Check description field (parse for "Chief Complaint:" line)
+        # --- 2. Check the 'description' column ---
         if case_obj.description:
-            desc = case_obj.description.strip()
-            if desc and desc.lower() not in bad_values:
-                # Try to extract from "Chief Complaint:" line
-                lines = desc.split('\n')
-                for line in lines:
-                    if 'chief complaint:' in line.lower():
-                        # Extract text after "Chief Complaint:"
-                        parts = line.split(':', 1)
-                        if len(parts) > 1:
-                            complaint = parts[1].strip()
-                            if complaint and complaint.lower() not in bad_values:
-                                logger.info(f"✓ Chief complaint from description line: {complaint[:50]}...")
-                                return complaint
+            val = str(case_obj.description).strip()
+            
+            if val and val.lower() not in bad_values:
+                # A. Clean up "Chief Complaint:" prefix if it exists
+                import re
+                start_match = re.search(r'chief complaint:', val, re.IGNORECASE)
+                if start_match:
+                    val = val[start_match.end():].strip()
                 
-                # If no "Chief Complaint:" line found, use first non-empty line
-                for line in lines:
-                    line = line.strip()
-                    if line and line.lower() not in bad_values:
-                        # Skip common headers
-                        if not any(header in line.lower() for header in ['medical history:', 'genetic history:', 'patient id:']):
-                            logger.info(f"✓ Chief complaint from first description line: {line[:50]}...")
-                            return line
-        
-        # 4. Last resort: Check inputs
+                # B. Cut off at "Medical History" or "Patient ID"
+                stop_markers = ['medical history', 'patient id', 'history:']
+                for marker in stop_markers:
+                    stop_match = re.search(marker, val, re.IGNORECASE)
+                    if stop_match:
+                        val = val[:stop_match.start()].strip()
+                        break
+                
+                # C. Return whatever is left (Even if it didn't start with "Chief Complaint")
+                if val: 
+                    return val
+
+        # --- 3. Check Inputs ---
         if hasattr(case_obj, 'inputs'):
             for input_obj in case_obj.inputs.all():
                 if input_obj.description:
-                    value = str(input_obj.description).strip()
-                    if value and value.lower() not in bad_values:
-                        logger.info(f"✓ Chief complaint from input: {value[:50]}...")
-                        return value
-        
-        # 5. If all else fails
-        logger.warning(f"✗ No valid chief complaint found for case {case_obj.id}")
-        logger.warning(f"   chief_complaint field: {getattr(case_obj, 'chief_complaint', 'N/A')}")
-        logger.warning(f"   profile_info: {case_obj.profile_info}")
-        logger.warning(f"   description: {case_obj.description[:100] if case_obj.description else 'N/A'}")
+                    val = str(input_obj.description).strip()
+                    if val and val.lower() not in bad_values:
+                        return val
+
+        # --- 4. Check JSON Profile ---
+        if case_obj.profile_info and isinstance(case_obj.profile_info, dict):
+            for key in ['chief_complaint', 'complaint', 'symptoms']:
+                if key in case_obj.profile_info:
+                    val = case_obj.profile_info[key]
+                    if isinstance(val, list): val = ", ".join([str(v) for v in val])
+                    val = str(val).strip()
+                    if val and val.lower() not in bad_values:
+                        return val
+            
         return "No chief complaint recorded."
-    
+  
     def get(self, request, diagnosis_id, *args, **kwargs):
         try:
             if not request.user or not request.user.is_authenticated:
@@ -1110,13 +1081,15 @@ class PatientReportDetailAPIView(APIView):
                 )
             
             case = diagnosis.diagnostic_case
+            
+            # Extract the complaint using the new logic
             complaint_text = self.extract_chief_complaint(case)
             
-           
+            # Get data sources
             inputs = case.inputs.all()
             data_sources = list(set([inp.input_type for inp in inputs if inp.input_type]))
             
-            
+            # Get recommendations
             recommendations = diagnosis.recommendations.all()
             next_steps = [
                 {
@@ -1147,8 +1120,6 @@ class PatientReportDetailAPIView(APIView):
                 'profile_info': case.profile_info or {}
             }
             
-            logger.info(f"✓ Returning report detail for diagnosis {diagnosis_id}")
-            logger.info(f"  Chief complaint: {complaint_text[:50]}...")
             return Response(report_detail, status=status.HTTP_200_OK)
             
         except Diagnosis.DoesNotExist:
@@ -1165,10 +1136,7 @@ class PatientReportDetailAPIView(APIView):
         if not description:
             return ["Detailed findings documented in comprehensive clinical assessment"]
         
-       
         sentences = [s.strip() for s in description.replace('\n', '. ').split('.') if s.strip()]
-        
-      
         return sentences[:5] if sentences else ["No specific findings documented"]
 
 class PatientActivityHistoryAPIView(APIView):
