@@ -219,6 +219,7 @@ export function HealthcareProfessionalRegistration() {
 
       try { 
         // Step 1: Create Supabase user
+        // We FORCE role to "doctor" here for Auth metadata
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email,
           password: password,
@@ -246,12 +247,13 @@ export function HealthcareProfessionalRegistration() {
         console.log("Supabase user created:", supabaseUserId);
 
         // Step 2: Create user in Django database
+        // We FORCE role to "doctor" here for the DB Table
         const registrationData = {
           id: supabaseUserId,
           first_name: firstName,
           last_name: lastName,
           gender,
-          role,
+          role: role,
           department,
           email,
           date_of_birth: dob,
@@ -275,8 +277,6 @@ export function HealthcareProfessionalRegistration() {
             try {
               // Sign out and attempt to delete the user
               await supabase.auth.signOut();
-              // Note: You may need admin privileges to delete users from Supabase
-              // For now, we'll just sign them out
             } catch (cleanupError) {
               console.error("Error during cleanup:", cleanupError);
             }

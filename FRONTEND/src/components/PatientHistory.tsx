@@ -62,10 +62,8 @@ export function PatientHistory() {
     try {
       setLoading(true);
       setError(null);
-
-      // Get auth token from Supabase instead of localStorage
+      //get auth token from supabase
       const { data: { session }, error: authError } = await supabase.auth.getSession();
-      
       if (authError || !session) {
         setError("Authentication required. Please log in.");
         setLoading(false);
@@ -78,7 +76,7 @@ export function PatientHistory() {
         "Content-Type": "application/json",
       };
 
-      // Fetch activity history and stats in parallel
+      //parallel fetch for performance optimizaton
       const [historyResponse, statsResponse] = await Promise.all([
         fetch("http://localhost:8000/api/patient/activity/history/", { headers }),
         fetch("http://localhost:8000/api/patient/activity/stats/", { headers }),
@@ -87,10 +85,9 @@ export function PatientHistory() {
       if (!historyResponse.ok || !statsResponse.ok) {
         throw new Error("Failed to fetch activity data");
       }
-
       const historyData = await historyResponse.json();
       const statsData = await statsResponse.json();
-
+      //mapping raw API data to UI timeline interface
       const transformedHistory: HistoryItem[] = historyData.activities.map((item: any) => ({
         id: item.id,
         type: item.type,
@@ -104,7 +101,9 @@ export function PatientHistory() {
 
       setHistory(transformedHistory);
       setStats(statsData);
-    } catch (err) {
+    } 
+    
+    catch (err) {
       console.error("Error fetching activity data:", err);
       setError(err instanceof Error ? err.message : "Failed to load activity data");
     } finally {

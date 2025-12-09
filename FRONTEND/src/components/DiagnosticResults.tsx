@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -7,11 +7,12 @@ import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
-  Download, FileText, MessageSquare, Image, FlaskConical, Dna, CheckCircle2,
+  Download, FileText, MessageSquare, Image, FlaskConical, CheckCircle2,
   Info, ExternalLink, TrendingUp, Activity, ArrowLeft, AlertCircle, 
-  Stethoscope, Pill, TestTube, BookOpen, Shield, Clock, AlertTriangle
+  Pill, TestTube, BookOpen, Shield, Clock, AlertTriangle, Save
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from '../supabaseClient'; 
 
 // --- Imports for PDF Generation ---
 import jsPDF from 'jspdf';
@@ -80,7 +81,8 @@ interface RecommendedTreatment {
 }
 
 interface AnalysisResult {
-  id?: string;
+  id?: string;             
+  diagnosis_id?: string;   
   primaryDiagnosis?: PrimaryDiagnosis;
   differentialDiagnoses?: DifferentialDiagnosis[];
   findings?: string[];
@@ -100,30 +102,182 @@ interface LocationState {
 }
 
 interface DiagnosticResultsProps {
-  onFeedback: (diagnosisId: string) => void;
+  onFeedback?: (diagnosisId: string) => void;
 }
 
-// --- EXPORT FUNCTION (Named Export to match App.tsx) ---
-export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
+// --- EXPORT FUNCTION ---
+export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState | null;
 
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveAttemptedRef = useRef(false);
+
+  // --- Auto-Save Logic ---
+  const saveDiagnosisToBackend = async (data: AnalysisResult) => {
+    // Prevent duplicate saves
+    if (saveAttemptedRef.current || data.id || data.diagnosis_id) return;
+    
+    // Ensure we have a caseId to attach to
+    if (!data.caseId) {
+      console.warn("Cannot save diagnosis: Missing caseId");
+      return;
+    }
+
+    saveAttemptedRef.current = true;
+    setIsSaving(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No authenticated session");
+
+      // 1. Consolidate Recommendations for Backend format
+      const backendRecommendations: { name: string | undefined; category: string; type: string; description: string; }[] = [];
+
+      // Map Next Steps
+      if (data.nextSteps) {
+        data.nextSteps.forEach(step => {
+          backendRecommendations.push({
+            name: step.action,
+            category: step.category,
+            type: 'Plan',
+            description: step.description || ''
+          });
+        });
+      }
+
+      // Map Tests
+      if (data.recommendedTests) {
+        data.recommendedTests.forEach(test => {
+          backendRecommendations.push({
+            name: test.test_name || test.name,
+            category: test.category || test.test_category || 'Test',
+            type: 'Diagnostic',
+            description: test.rationale || test.description || ''
+          });
+        });
+      }
+
+      // Map Treatments
+      if (data.recommendedTreatments) {
+        data.recommendedTreatments.forEach(rx => {
+          backendRecommendations.push({
+            name: rx.treatment_name || rx.name,
+            category: rx.category || rx.treatment_category || 'Treatment',
+            type: 'Medication',
+            description: rx.description || ''
+          });
+        });
+      }
+
+      // 2. Prepare Payload
+      const payload = {
+        case_id: data.caseId,
+        diagnosis: {
+          name: data.primaryDiagnosis?.name || "Unknown",
+          confidence: data.primaryDiagnosis?.confidence || 0,
+          description: data.primaryDiagnosis?.description || ""
+        },
+        recommendations: backendRecommendations
+      };
+
+      // 3. Send Request
+      const API_URL = `${import.meta.env.VITE_API_URL || ''}/api/diagnosis/save/`; 
+      
+      console.log("Auto-saving diagnosis to:", API_URL);
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Server returned ${response.status}: ${errText}`);
+      }
+
+      const result = await response.json();
+      console.log("Save success:", result);
+
+      // 4. Update local state with the new ID
+      setAnalysis(prev => prev ? ({
+        ...prev,
+        id: result.diagnosis_id, 
+        diagnosis_id: result.diagnosis_id
+      }) : null);
+
+      toast.success("Analysis saved to patient history");
+
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+      toast.error("Note: Result not saved to database. Feedback unavailable.");
+      saveAttemptedRef.current = false; 
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (state?.result) {
+      console.log("Diagnostic Results Loaded:", state.result);
+
       if (state.result.error) {
         toast.error(state.result.error);
       }
-      setAnalysis(state.result);
+
+      const raw = state.result;
+      const normalizedAnalysis: AnalysisResult = {
+        ...raw,
+        id: raw.id || raw.diagnosis_id
+      };
+
+      setAnalysis(normalizedAnalysis);
       setIsLoading(false);
+
+      // Trigger auto-save if ID is missing but we have a caseId
+      if (!normalizedAnalysis.id && !normalizedAnalysis.diagnosis_id && normalizedAnalysis.caseId) {
+        saveDiagnosisToBackend(normalizedAnalysis);
+      }
+
     } else {
       toast.error("No analysis data found. Redirecting...");
       navigate('/healthcare/upload');
     }
   }, [state, navigate]);
+
+  const handleFeedbackClick = () => {
+    if (!analysis) return;
+
+    // Check if we have a valid ID to attach feedback to
+    const validId = analysis.id || analysis.diagnosis_id;
+
+    if (!validId) {
+      if (analysis.caseId && !isSaving) {
+        toast.loading("Saving diagnosis first...");
+        saveDiagnosisToBackend(analysis);
+      } else {
+        toast.error("Cannot provide feedback: Diagnosis not saved yet.");
+      }
+      return;
+    }
+
+    // --- REDIRECT TO FEEDBACK SYSTEM ---
+    // We pass the diagnosisId in the state so the feedback page can select it
+    navigate('/healthcare/feedback', { 
+      state: { 
+        diagnosisId: validId,
+        caseId: analysis.caseId,
+        fromDiagnosis: true
+      } 
+    });
+  };
 
   // --- PDF Export Logic ---
   const handleExportReport = () => {
@@ -138,14 +292,12 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
       const margin = 20;
       const contentWidth = pageWidth - (margin * 2);
       
-      // Colors
-      const primaryColor: [number, number, number] = [15, 118, 110]; // Teal
-      const secondaryColor: [number, number, number] = [100, 116, 139]; // Slate
-      const accentColor: [number, number, number] = [241, 245, 249]; // Slate 100
+      const primaryColor: [number, number, number] = [15, 118, 110];
+      const secondaryColor: [number, number, number] = [100, 116, 139]; 
+      const accentColor: [number, number, number] = [241, 245, 249]; 
 
       let yPos = 0;
 
-      // Helper: Header
       const addHeader = () => {
         doc.setFillColor(...primaryColor);
         doc.rect(0, 0, pageWidth, 40, 'F');
@@ -168,7 +320,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
         yPos = 55;
       };
 
-      // Helper: Footer
       const addFooter = () => {
         const totalPages = doc.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
@@ -188,7 +339,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
 
       addHeader();
 
-      // --- Metadata Grid ---
       doc.setDrawColor(220);
       doc.setFillColor(250, 250, 250);
       doc.roundedRect(margin, yPos, contentWidth, 35, 2, 2, 'FD');
@@ -208,7 +358,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(0);
       
-      // Truncate ID
       const displayId = analysis.caseId ? analysis.caseId.slice(0, 13) + "..." + analysis.caseId.slice(-4) : "N/A";
       const displayDate = analysis.caseDate ? new Date(analysis.caseDate).toLocaleDateString() : new Date().toLocaleDateString();
       
@@ -218,7 +367,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
 
       yPos += 45;
 
-      // --- Primary Diagnosis ---
       doc.setFontSize(12);
       doc.setTextColor(...primaryColor);
       doc.setFont("helvetica", "bold");
@@ -243,7 +391,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
 
       yPos += boxHeight + 15;
 
-      // --- Description / Findings ---
       doc.setFontSize(12);
       doc.setTextColor(...primaryColor);
       doc.setFont("helvetica", "bold");
@@ -260,26 +407,21 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
       
       yPos += (splitDesc.length * 5) + 10;
 
-      // Key Findings Bullet points
       if (analysis.findings && analysis.findings.length > 0) {
          yPos += 5;
          analysis.findings.forEach(finding => {
            const findingText = `• ${finding}`;
            const splitFinding = doc.splitTextToSize(findingText, contentWidth);
-           
-           // Page break check
            if (yPos + (splitFinding.length * 5) > pageHeight - 30) {
              doc.addPage();
              yPos = 20;
            }
-           
            doc.text(splitFinding, margin, yPos);
            yPos += (splitFinding.length * 5);
          });
          yPos += 10;
       }
 
-      // --- Recommendations / Next Steps ---
       if (yPos > pageHeight - 60) {
         doc.addPage();
         yPos = 20;
@@ -339,9 +481,6 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
       toast.error("Failed to generate PDF: " + error.message);
     }
   };
-
-
-  // --- UI Rendering ---
 
   if (isLoading || !analysis) {
     return (
@@ -414,6 +553,12 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                   <Badge variant="outline" className="ml-2">
                     {analysis.dataSource === "Clinical Database" ? " Evidence-Based" : "AI-Generated"}
                   </Badge>
+                )}
+                {/* Visual indicator for Save Status */}
+                {analysis.id && (
+                    <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> Saved
+                    </Badge>
                 )}
               </p>
             </div>
@@ -853,10 +998,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps) {
                 Generated by LLaVA-Med AI
               </span>
             </div>
-            <Button onClick={() => analysis?.id && onFeedback(analysis.id)}>
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Provide Feedback
-            </Button>
+        
           </div>
         </Card>
       </div>

@@ -1,5 +1,131 @@
 [
   {
+    "id": "4d1892d0-9c8c-4eaa-8241-df445def2f34",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "the actual diagnosis was a brain tumour"
+      }
+    ]
+  },
+  {
+    "id": "036ea3d8-b9bd-4cb8-871d-2410360179bf",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown. Note: the description pointed towards the correct diagnosis. however the primary diagnosis (1) was incorrect"
+      }
+    ]
+  },
+  {
+    "id": "96b7878a-47d2-4eec-b528-692cabb21bf4",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown"
+      }
+    ]
+  },
+  {
+    "id": "4cf666a8-5d75-49dc-8177-5901f5e223ce",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Persistent thirst and frequent urination over the last three months.\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "Unknown. Note: the description pointed towards the correct diagnosis (type2 diabetes) but the title was misleading"
+      }
+    ]
+  },
+  {
+    "id": "27919f42-d96f-4a29-9059-e3babf41e5e2",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "brain tumour"
+      }
+    ]
+  },
+  {
+    "id": "d09f2477-e065-47c4-a1f3-68d274d15b45",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "pneunomia due to covid 19"
+      }
+    ]
+  },
+  {
+    "id": "fd30e848-4397-425c-acf1-24f5f1372819",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nCase Description: Not Specified\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "brain tumour"
+      }
+    ]
+  },
+  {
+    "id": "0e597d99-be61-4ec3-9158-ec86cf8ca97b",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "pneunomia caused by covid 19"
+      }
+    ]
+  },
+  {
+    "id": "93dd8916-c847-46e2-970a-51da800adcd1",
+    "image": "text_only_placeholder.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nAnalyze the following medical case and provide a diagnosis."
+      },
+      {
+        "from": "gpt",
+        "value": "pneunomia due to covid 19"
+      }
+    ]
+  },
+  {
     "id": "54c41c33-7079-43f1-b8fe-3ecf75d5b649",
     "image": "text_only_placeholder.jpg",
     "conversations": [

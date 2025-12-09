@@ -107,20 +107,19 @@ export function HealthcareDataUpload() {
   const [chiefComplaint, setChiefComplaint] = useState("");
   const [medicalHistory, setMedicalHistory] = useState("");
   
-  // NEW: Genetic History State
+ 
   const [geneticHistory, setGeneticHistory] = useState("");
 
   const [activeTab, setActiveTab] = useState("images");
   const [dragOver, setDragOver] = useState(false);
-  
-  // REMOVED: genetic array from files state
+
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({
     images: [],
     notes: [],
     labs: [],
   });
 
-  // REMOVED: Genetic Data from uploadZones (Only 3 items remain)
+ 
   const uploadZones = [
     { id: "images", label: "Medical Images", icon: Image, formats: "JPG, JPEG, PNG, DICOM", maxSize: "100MB" },
     { id: "notes", label: "Clinical Notes", icon: FileText, formats: "PDF, DOC, DOCX, TXT", maxSize: "50MB" },
@@ -265,9 +264,6 @@ export function HealthcareDataUpload() {
     }
   };
 
-  // ============================================================================
-  // MULTI-FILE COMBINED ANALYSIS
-  // ============================================================================
   const analyzeMultipleFilesCombined = async (
     allFiles: Array<{ file: File; category: string; name: string }>,
     patientContext: string,
@@ -278,12 +274,12 @@ export function HealthcareDataUpload() {
       
       const formData = new FormData();
       
-      // Add all files to the form data
+      //add all files to the form data
       allFiles.forEach(fileData => {
         formData.append('files', fileData.file);
       });
       
-      // Add patient context
+      //add patient context
       formData.append('patient_context', patientContext);
       formData.append('user_id', session.user.id);
       
@@ -295,7 +291,7 @@ export function HealthcareDataUpload() {
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 180000 // 3 minutes for multiple files
+          timeout: 180000 
         }
       );
       
@@ -351,9 +347,6 @@ export function HealthcareDataUpload() {
     fetchClinicianData();
   }, [navigate]);
 
-  // ============================================================================
-  // MAIN ANALYSIS HANDLER
-  // ============================================================================
   const handleProceedToAnalysis = async () => {
   setIsSubmitting(true);
   
@@ -364,13 +357,9 @@ export function HealthcareDataUpload() {
     }
 
     const token = session.access_token;
-    
-    // === CRITICAL FIX: Ensure we're sending actual values, not defaults ===
     const actualChiefComplaint = chiefComplaint?.trim() || "";
     const actualMedicalHistory = medicalHistory?.trim() || "";
     const actualGeneticHistory = geneticHistory?.trim() || "";
-    
-
     const descriptionParts = [];
     if (actualChiefComplaint) {
       descriptionParts.push(`Chief Complaint: ${actualChiefComplaint}`);
@@ -399,12 +388,12 @@ export function HealthcareDataUpload() {
         ...(actualGeneticHistory && { genetic_history: actualGeneticHistory })
       }
     };
-    
     console.log(" Creating case with data:", caseData);
-    
     const caseResponse = await axios.post('/api/cases/', caseData, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
+
+
     const caseId = caseResponse.data.id;
     
     console.log(" Case created successfully:", caseResponse.data);
@@ -457,10 +446,6 @@ export function HealthcareDataUpload() {
         return;
       }
 
-      // ========================================================================
-      // STEP 4: PREPARE PATIENT CONTEXT FOR AI
-      // ========================================================================
-      // MODIFIED: Included Genetic History in AI Context
       const patientContext = [
         chiefComplaint && `Chief Complaint: ${chiefComplaint}`,
         medicalHistory && `Medical History: ${medicalHistory}`,
@@ -470,15 +455,12 @@ export function HealthcareDataUpload() {
         patientId && `Patient ID: ${patientId}`
       ].filter(Boolean).join('\n\n');
 
-      // ========================================================================
-      // STEP 5: DECIDE ANALYSIS STRATEGY
-      // ========================================================================
       try {
         let aiResult: AnalysisResult;
         
         if (allFilesForAnalysis.length > 1) {
-          // MULTI-FILE COMBINED ANALYSIS
-          toast.info("🔬 Performing comprehensive multi-modal analysis...", {
+          
+          toast.info(" Performing comprehensive multi-modal analysis...", {
             description: `Analyzing ${allFilesForAnalysis.length} files together for accurate diagnosis`
           });
           
@@ -488,7 +470,7 @@ export function HealthcareDataUpload() {
             session
           );
           
-          // Show which data sources were analyzed
+         
           if (aiResult.dataSourcesAnalyzed) {
             const sources = aiResult.dataSourcesAnalyzed;
             const sourcesList = [];
@@ -496,7 +478,7 @@ export function HealthcareDataUpload() {
             if (sources.labResults > 0) sourcesList.push(`${sources.labResults} lab result(s)`);
             if (sources.clinicalNotes > 0) sourcesList.push(`${sources.clinicalNotes} clinical note(s)`);
             
-            toast.success(`✅ Comprehensive analysis complete!`, {
+            toast.success(` Comprehensive analysis complete!`, {
               description: `Analyzed: ${sourcesList.join(', ')}`
             });
           }
@@ -522,9 +504,6 @@ export function HealthcareDataUpload() {
           toast.success("AI analysis complete!");
         }
 
-        // ========================================================================
-        // STEP 6: NAVIGATE TO RESULTS
-        // ========================================================================
         navigate('/healthcare/results', { 
           state: { 
             result: aiResult,
@@ -1046,15 +1025,6 @@ export function HealthcareDataUpload() {
           <div className="flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
             <Button 
               variant="outline" 
-              className="flex-1 sm:flex-auto" 
-              disabled={isSubmitting}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save as Draft
-            </Button>
-            
-            <Button 
-              variant="outline" 
               onClick={clearAll} 
               disabled={totalFiles === 0 || isSubmitting} 
               className="flex-1 sm:flex-auto"
@@ -1144,7 +1114,7 @@ export function HealthcareDataUpload() {
                   <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4 list-disc">
                     <li><strong>Medical Images</strong> (JPG, PNG, DICOM): Visual analysis with LLaVA-Med</li>
                     <li><strong>Documents</strong> (PDF, DOCX): Text extraction + RAG-enhanced diagnosis</li>
-                    <li><strong>Lab Results</strong> (TXT, CSV): Direct text analysis with medical knowledge base</li>
+                    <li><strong>Lab Results</strong> (TXT, CSV, JPG, PNG, DICOM): Direct text analysis with medical knowledge base</li>
                   </ul>
                 </>
               )}

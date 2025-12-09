@@ -90,6 +90,7 @@ export function PatientMyReports() {
 
     setLoading(true);
     try {
+      //secure API call with Bearer token
       const response = await axios.get('http://127.0.0.1:8000/api/patients/reports/', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
@@ -136,7 +137,7 @@ export function PatientMyReports() {
       const pageHeight = pdf.internal.pageSize.getHeight();
       let yPos = 20;
       
-      // Header
+      //header and branding
       pdf.setFillColor(13, 148, 136);
       pdf.rect(0, 0, pageWidth, 40, 'F');
       
@@ -173,9 +174,6 @@ export function PatientMyReports() {
       pdf.text('Complete', 150, yPos + 16);
       
       yPos += 35;
-      
-     
-
       // Primary Diagnosis
       pdf.setFillColor(240, 248, 255);
       pdf.rect(15, yPos, pageWidth - 30, 12, 'F');
@@ -243,7 +241,7 @@ export function PatientMyReports() {
         yPos += 5;
       }
       
-      // Recommendations Table
+      //dynamic recommendations table
       if (report.nextSteps && report.nextSteps.length > 0) {
         if (yPos > pageHeight - 80) {
           pdf.addPage();
@@ -295,7 +293,7 @@ export function PatientMyReports() {
         yPos = (pdf as any).lastAutoTable.finalY + 10;
       }
       
-      // Disclaimer
+      //disclaimer section
       if (yPos > pageHeight - 40) {
         pdf.addPage();
         yPos = 20;

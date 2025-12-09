@@ -70,29 +70,23 @@ export function FeedbackModal({
     setIsSubmitting(true);
     setError("");
 
-    // Validation
+    //validation
     if (accuracyCorrectness === "incorrect" && !actualDiagnosis.trim()) {
       setError("Please provide the actual diagnosis when marking as incorrect");
       setIsSubmitting(false);
       return;
     }
-
     if (dataQuality === "no" && !dataQualityIssues.trim()) {
       setError("Please describe the data quality issues");
       setIsSubmitting(false);
       return;
     }
-
     try {
-      
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
       if (sessionError || !session) {
         throw new Error("Authentication token not found. Please log in again.");
       }
-
       const token = session.access_token;
-
       const feedbackData = {
         diagnosis: diagnosisId,
         accuracy_stars: accuracyStars || null,
@@ -106,11 +100,10 @@ export function FeedbackModal({
         data_quality: dataQuality || null,
         data_quality_issues: dataQualityIssues || null,
       };
-
-      //debugging purposes
+      
+      //submit to backend api
       const apiUrl = `${import.meta.env.VITE_API_URL}/api/feedback/submit/`;
       console.log("Submitting feedback to URL:", apiUrl); 
-
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -120,9 +113,7 @@ export function FeedbackModal({
         
         body: JSON.stringify(feedbackData),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "Failed to submit feedback");
       }

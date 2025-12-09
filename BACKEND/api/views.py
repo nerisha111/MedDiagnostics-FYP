@@ -133,7 +133,7 @@ def register_clinician(request):
                     first_name=data['first_name'],
                     last_name=data['last_name'],
                     gender=data['gender'],
-                    role='clinician', 
+                    role=data['role'], 
                     email=data['email'],
                     date_of_birth=data['date_of_birth'],
                 )
@@ -1140,26 +1140,19 @@ class PatientReportDetailAPIView(APIView):
         return sentences[:5] if sentences else ["No specific findings documented"]
 
 class PatientActivityHistoryAPIView(APIView):
-    """
-    Get activity history for the authenticated patient.
-    Returns a timeline of uploads, analyses, downloads, and views.
-    """
+
     permission_classes = [IsAuthenticated]
-    
     def get(self, request, *args, **kwargs):
         try:
             user = request.user
-            
-            # Get all diagnostic cases for this patient
+             #get all diagnostic cases for this patient
             cases = Diagnosticcase.objects.filter(user=user).prefetch_related(
                 'inputs', 'diagnoses'
             ).order_by('-created_at')
             
             activities = []
-            
-            # Process each case to extract activities
+            #process each case to extract activities
             for case in cases:
-                # Upload activities from inputs
                 for input_obj in case.inputs.all():
                     activities.append({
                         'id': str(input_obj.id),
@@ -1171,8 +1164,7 @@ class PatientActivityHistoryAPIView(APIView):
                         'status': 'success',
                         'details': f'{input_obj.file_size // 1024 if input_obj.file_size else 0} KB'
                     })
-                
-                # Analysis activities from diagnoses
+                #fetch completed diagnoses for this case
                 for diagnosis in case.diagnoses.all():
                     activities.append({
                         'id': str(diagnosis.id),
@@ -1184,7 +1176,6 @@ class PatientActivityHistoryAPIView(APIView):
                         'status': 'success',
                         'details': f'{int(diagnosis.confidence)}% confidence' if diagnosis.confidence else None
                     })
-                    
                     # View activity when diagnosis was reviewed
                     if diagnosis.is_reviewed and diagnosis.date_reviewed:
                         activities.append({
@@ -1197,10 +1188,8 @@ class PatientActivityHistoryAPIView(APIView):
                             'status': 'success',
                             'details': None
                         })
-            
-            # Sort activities by date and time (most recent first)
+            #time-based merge sort
             activities.sort(key=lambda x: (x['date'], x['time']), reverse=True)
-            
             return Response({
                 'activities': activities
             }, status=status.HTTP_200_OK)

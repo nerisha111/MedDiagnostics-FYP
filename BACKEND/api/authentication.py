@@ -10,15 +10,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class SupabaseAuthentication(BaseAuthentication):
-    """
-    Custom authentication class to validate JWTs issued by Supabase.
-    --- DEBUGGING VERSION ---
-    """
+    
     def authenticate(self, request):
         auth_header = request.headers.get('Authorization')
         
-        logger.debug("--- Supabase Auth Attempt ---")
-
         if not auth_header:
             logger.debug("No Authorization header found.")
             return None
@@ -26,31 +21,17 @@ class SupabaseAuthentication(BaseAuthentication):
         try:
             token = auth_header.split(' ')[1]
         except IndexError:
-            logger.error("Malformed Authorization header. Token is missing.")
-            
             return None
-
-        
-        secret_from_settings = settings.SUPABASE_JWT_SECRET
-        logger.debug(f"Using JWT Secret from settings: '{secret_from_settings}'")
-        if not secret_from_settings:
-            logger.error("FATAL: SUPABASE_JWT_SECRET is not set in Django settings!")
-            return None
-
         
         try:
             payload = jwt.decode(
                 token, 
-                secret_from_settings,
+                settings.SUPABASE_JWT_SECRET,
                 algorithms=['HS256'],
                 audience='authenticated'
             )
-            logger.debug("SUCCESS: Token decoded successfully.")
 
         except Exception as e:
-           
-            logger.error(f"TOKEN VALIDATION FAILED. Reason: {e}")
-            
             raise exceptions.AuthenticationFailed(f'Invalid or expired token. Error: {e}')
 
         user_id = payload.get('sub')

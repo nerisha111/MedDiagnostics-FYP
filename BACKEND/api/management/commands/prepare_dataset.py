@@ -4,7 +4,7 @@ import requests
 import shutil
 from PIL import Image 
 from django.core.management.base import BaseCommand
-from api.models import Feedback
+from api.models import Feedback 
 
 class Command(BaseCommand):
     help = 'Exports data for LLaVA (Handles missing images via dummy fallback)'
@@ -13,17 +13,18 @@ class Command(BaseCommand):
         base_dir = "training_export"
         images_dir = os.path.join(base_dir, "images")
         
+        #setup directories and dummy placeholder
         if os.path.exists(base_dir): shutil.rmtree(base_dir)
         os.makedirs(images_dir)
 
-        # Create a reusable black dummy image for text-only cases
+        #create a reusable black dummy image for text-only cases to satisfy llava-med architecture
         dummy_path = os.path.join(images_dir, "text_only_placeholder.jpg")
         Image.new('RGB', (224, 224), color='black').save(dummy_path)
 
-        # Get feedbacks that are incorrect/partial
+        #filter for cases that need correction
         feedbacks = Feedback.objects.filter(accuracy_correctness__in=['incorrect', 'partial'])
         
-        print(f"\n🔍 Found {feedbacks.count()} training candidates.")
+        print(f"\nFound {feedbacks.count()} training candidates.")
 
         dataset = []
         count_success = 0
@@ -31,7 +32,6 @@ class Command(BaseCommand):
         for item in feedbacks:
             case = item.diagnosis.diagnostic_case
             
-            # 1. Try to find a Real Image
             img_input = None
             inputs = case.inputs.all()
             for inp in inputs:
@@ -39,9 +39,9 @@ class Command(BaseCommand):
                     img_input = inp
                     break
             
-            final_image_filename = "text_only_placeholder.jpg" # Default to dummy
+            final_image_filename = "text_only_placeholder.jpg" #default to dummy
             
-            # 2. If Real Image exists, download it
+            # if real image exists, download it
             if img_input:
                 ext = img_input.file_name.split('.')[-1] if img_input.file_name else 'jpg'
                 real_filename = f"{case.id}.{ext}"
@@ -60,8 +60,7 @@ class Command(BaseCommand):
             else:
                 print(f"    Case {case.id} is Text-Only. Using black placeholder.")
 
-            # 3. Construct the Text Prompt
-            # If we don't have an image,text description is CRITICAL.
+            
             user_text = "Analyze the following medical case and provide a diagnosis."
             
             # Add patient profile/description to the prompt
@@ -74,10 +73,12 @@ class Command(BaseCommand):
             if context_parts:
                 user_text = "\n".join(context_parts) + "\n" + user_text
 
+            #construct ground truth answer
             ground_truth = item.actual_diagnosis or "Unknown"
             if item.general_comments:
                 ground_truth += f". Note: {item.general_comments}"
 
+            #format for llava json
             entry = {
                 "id": str(case.id),
                 "image": final_image_filename, # Points to real image OR black square
@@ -95,7 +96,7 @@ class Command(BaseCommand):
             dataset.append(entry)
             count_success += 1
 
-        # Save and Zip
+        #save and zip
         json_path = os.path.join(base_dir, "dataset.json")
         with open(json_path, 'w') as f:
             json.dump(dataset, f, indent=2)

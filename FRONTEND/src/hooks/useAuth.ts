@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
 
-type UserRole = 'patient' | 'doctor' | 'nurse' | null;
+// UPDATED: Added 'clinician' to the allowed types
+type UserRole = 'patient' | 'doctor' | 'nurse' | 'clinician' | null;
 
 interface AuthUser {
   id: string;
@@ -54,6 +55,8 @@ export function useAuth(options?: UseAuthOptions) {
           .eq('supabase_user_id', authUser.id)
           .single();
 
+        console.log(' Database Query Result:', { userData, dbError });
+
         if (dbError) {
           console.error('Database error:', dbError);
           throw new Error('Unable to verify user profile');
@@ -66,13 +69,20 @@ export function useAuth(options?: UseAuthOptions) {
         // Step 3: Validate role matches the required portal
         const userRole = userData.role as UserRole;
         
-        // Check if user has the correct role for this portal
+        console.log(' Auth Debug:', {
+          userRole,
+          requiredRole: options?.requiredRole,
+          userData
+        });
+
+        // FIXED: Improved role validation logic
         if (options?.requiredRole) {
-          const isClinicianRole = userRole === 'doctor' || userRole === 'nurse';
-          const isPatientRole = userRole === 'patient';
+          const isClinicianRole = ['doctor', 'nurse', 'clinician'].includes(userRole?.toLowerCase() || '');
+          const isPatientRole = userRole?.toLowerCase() === 'patient';
 
           if (options.requiredRole === 'clinician' && !isClinicianRole) {
             if (isMounted) {
+              console.log(' Access denied: User is not a clinician', { userRole, isClinicianRole });
               await supabase.auth.signOut();
               toast.error('Access Denied: You do not have permission to access the healthcare portal. Please use the patient portal.');
               navigate('/patient/login');
@@ -82,6 +92,7 @@ export function useAuth(options?: UseAuthOptions) {
 
           if (options.requiredRole === 'patient' && !isPatientRole) {
             if (isMounted) {
+              console.log(' Access denied: User is not a patient', { userRole, isPatientRole });
               await supabase.auth.signOut();
               toast.error('Access Denied: You do not have permission to access the patient portal. Please use the healthcare professional portal.');
               navigate('/healthcare/login');
@@ -92,6 +103,7 @@ export function useAuth(options?: UseAuthOptions) {
 
         // Step 4: Set authorized user
         if (isMounted) {
+          console.log(' User authorized:', { id: userData.id, role: userRole });
           setUser({
             id: userData.id,
             email: userData.email,
@@ -121,6 +133,7 @@ export function useAuth(options?: UseAuthOptions) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      console.log('🔄 Auth state changed:', event);
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAuthorized(false);

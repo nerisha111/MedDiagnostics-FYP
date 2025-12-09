@@ -606,7 +606,7 @@ export function PatientDataUpload() {
           </div>
           
           <div className="flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button variant="outline" className="flex-1 sm:flex-auto" disabled={isSubmitting}><Save className="w-4 h-4 mr-2" />Save as Draft</Button>
+            
             <Button variant="outline" onClick={clearAll} disabled={totalFiles === 0 || isSubmitting} className="flex-1 sm:flex-auto">Clear All</Button>
             <Button onClick={handleProceedToAnalysis} disabled={validatedFiles === 0 || hasErrors || isSubmitting} className="bg-primary hover:bg-primary/90 flex-1 sm:flex-auto">
               {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <>Proceed to Analysis<ArrowRight className="w-4 h-4 ml-2" /></>}
