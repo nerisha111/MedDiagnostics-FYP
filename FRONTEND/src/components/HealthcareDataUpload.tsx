@@ -49,8 +49,6 @@ import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
 
 
-const MEDICAL_AI_API_URL = "https://roffvw4k1z5a3n-8004.proxy.runpod.net";
-
 
 interface UploadedFile {
   file: File;
@@ -194,7 +192,7 @@ export function HealthcareDataUpload() {
         formData.append('user_id', session.user.id);
         
         const response = await axios.post(
-          `${MEDICAL_AI_API_URL}/analyze_image`,
+          `/ai-service/analyze_image`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
@@ -214,7 +212,7 @@ export function HealthcareDataUpload() {
         formData.append('user_id', session.user.id);
         
         const response = await axios.post(
-          `${MEDICAL_AI_API_URL}/analyze_medical_document`,
+          `/ai-service/analyze_medical_document`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
@@ -236,7 +234,7 @@ export function HealthcareDataUpload() {
         formData.append('user_id', session.user.id);
         
         const response = await axios.post(
-          `${MEDICAL_AI_API_URL}/analyze_medical_text`,
+          `/ai-service/analyze_medical_text`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
@@ -287,7 +285,7 @@ export function HealthcareDataUpload() {
         allFiles.map(f => `${f.name} (${f.category})`));
       
       const response = await axios.post(
-        `${MEDICAL_AI_API_URL}/analyze_multiple_files`,
+        `/ai-service/analyze_multiple_files`,
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },

@@ -44,9 +44,6 @@ import {
 import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
 
-// === CONFIGURATION ===
-const MEDICAL_AI_API_URL = "https://roffvw4k1z5a3n-8004.proxy.runpod.net";
-
 // === INTERFACES ===
 interface UploadedFile {
   file: File;
@@ -177,7 +174,7 @@ export function PatientDataUpload() {
         formData.append('question', patientContext);
         formData.append('user_id', session.user.id);
         
-        const response = await axios.post(`${MEDICAL_AI_API_URL}/analyze_image`, formData, {
+        const response = await axios.post(`/ai-service/analyze_image`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 60000 
         });
@@ -190,7 +187,7 @@ export function PatientDataUpload() {
         formData.append('patient_context', patientContext);
         formData.append('user_id', session.user.id);
         
-        const response = await axios.post(`${MEDICAL_AI_API_URL}/analyze_medical_document`, formData, {
+        const response = await axios.post(`/ai-service/analyze_medical_document`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 90000 
         });
@@ -204,7 +201,7 @@ export function PatientDataUpload() {
         formData.append('patient_context', patientContext);
         formData.append('user_id', session.user.id);
         
-        const response = await axios.post(`${MEDICAL_AI_API_URL}/analyze_medical_text`, formData, {
+        const response = await axios.post(`/ai-service/analyze_medical_text`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 60000
         });
@@ -230,7 +227,7 @@ export function PatientDataUpload() {
       formData.append('patient_context', patientContext);
       formData.append('user_id', session.user.id);
       
-      const response = await axios.post(`${MEDICAL_AI_API_URL}/analyze_multiple_files`, formData, {
+      const response = await axios.post(`/ai-service/analyze_multiple_files`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 180000 
       });
@@ -268,7 +265,7 @@ export function PatientDataUpload() {
         }
       };
       
-      const caseResponse = await axios.post('http://127.0.0.1:8000/api/cases/', caseData, {
+      const caseResponse = await axios.post('/api/cases/', caseData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const caseId = caseResponse.data.id;
@@ -292,7 +289,7 @@ export function PatientDataUpload() {
       );
 
       if (allFilesData.length > 0) {
-        await axios.post('http://127.0.0.1:8000/api/inputs/bulk-create/', allFilesData, {
+        await axios.post('/api/inputs/bulk-create/', allFilesData, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
       }

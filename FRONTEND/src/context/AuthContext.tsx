@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const token = currentSession.access_token;
-      const response = await axios.get('http://127.0.0.1:8000/api/profile/me/', {
+      const response = await axios.get('/api/profile/me/', {
         headers: {
           Authorization: `Bearer ${token}`
         },
