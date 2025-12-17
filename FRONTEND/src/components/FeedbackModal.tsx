@@ -102,7 +102,7 @@ export function FeedbackModal({
       };
       
       //submit to backend api
-      const apiUrl = `${import.meta.env.VITE_API_URL}/api/feedback/submit/`;
+      const apiUrl = `/api/feedback/submit/`;
       console.log("Submitting feedback to URL:", apiUrl); 
       const response = await fetch(apiUrl, {
         method: "POST",

@@ -90,7 +90,7 @@ export function ReportHistory() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("Not authenticated");
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/with-feedback/`, {
+        const response = await fetch(`/api/diagnoses/with-feedback/`, {
           headers: { "Authorization": `Bearer ${session.access_token}` },
         });
 
@@ -169,7 +169,7 @@ export function ReportHistory() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/${reportId}/`, {
+      const response = await fetch(`/api/diagnoses/${reportId}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
       
@@ -195,7 +195,7 @@ export function ReportHistory() {
       if (!session) throw new Error("Not authenticated");
 
       // 1. Fetch Full Details (needed for description and recommendations)
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/${report.id}/`, {
+      const response = await fetch(`/api/diagnoses/${report.id}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
 

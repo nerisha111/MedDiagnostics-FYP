@@ -72,10 +72,10 @@ import autoTable from 'jspdf-autotable';
 
 // --- Configuration ---
 const API_ENDPOINTS = {
-  DIAGNOSES_LIST: `/diagnoses/with-feedback/`,
-  FEEDBACK_STATS: `/feedback/stats/`,
-  DIAGNOSIS_DETAIL: (id: string) => `/diagnoses/${id}/`,
-  FEEDBACK_DETAIL: (id: string) => `/feedback/diagnosis/${id}/`,
+  DIAGNOSES_LIST: `/api/diagnoses/with-feedback/`,
+  FEEDBACK_STATS: `/api/feedback/stats/`,
+  DIAGNOSIS_DETAIL: (id: string) => `/api/diagnoses/${id}/`,
+  FEEDBACK_DETAIL: (id: string) => `/api/feedback/diagnosis/${id}/`,
 };
 
 // --- Interfaces ---
