@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; 
+import { useState } from "react";
+import { useTheme } from "../context/theme-provider";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -12,33 +12,21 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Slider } from "./ui/slider";
-import { ArrowLeft, Palette } from "lucide-react";
+import { Palette } from "lucide-react";
 import { toast } from "sonner";
 
-
 export function Settings() {
-  const navigate = useNavigate();
-  const [fontSize, setFontSize] = useState(16);
-  const [theme, setTheme] = useState("light");
+  const { theme, setTheme, fontSize, setFontSize } = useTheme();
 
-  // Apply font size changes in real-time
-  useEffect(() => {
-    document.documentElement.style.setProperty("--font-size", `${fontSize}px`);
-  }, [fontSize]);
-
-  // Apply theme changes in real-time
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
+  const [originalSettings] = useState({ theme, fontSize });
 
   const handleSave = () => {
     toast.success("Settings saved successfully");
-    // Optionally navigate back after saving
-    navigate(-1);
+  };
+
+  const handleCancel = () => {
+    setTheme(originalSettings.theme);
+    setFontSize(originalSettings.fontSize);
   };
 
   return (
@@ -193,8 +181,7 @@ export function Settings() {
 
           {/* Save Button */}
           <div className="flex justify-end gap-3 pt-4">
-          
-            <Button variant="outline" onClick={() => navigate(-1)}>
+            <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
             <Button onClick={handleSave} className="bg-primary hover:bg-primary/90">
