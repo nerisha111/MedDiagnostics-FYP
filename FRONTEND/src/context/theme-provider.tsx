@@ -12,26 +12,38 @@ interface ThemeProviderState {
 const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize from localStorage immediately so it doesn't "flash" default values
-  const [theme, setTheme] = useState<Theme>(
+  // Initialize from localStorage immediately
+  const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem("app-theme") as Theme) || "light"
   );
-  const [fontSize, setFontSize] = useState<number>(
+  const [fontSize, setFontSizeState] = useState<number>(
     () => Number(localStorage.getItem("app-font-size")) || 16
   );
 
+  // Apply visual changes to the DOM (Real-time Preview)
+  // This runs whenever theme or fontSize changes in the state
   useEffect(() => {
     const root = window.document.documentElement;
 
-    // 1. Apply Theme
+    // Apply Theme
     root.classList.remove("light", "dark");
     root.classList.add(theme);
-    localStorage.setItem("app-theme", theme);
 
-    // 2. Apply Font Size to CSS Variable
+    // Apply Font Size
     root.style.setProperty("--font-size", `${fontSize}px`);
-    localStorage.setItem("app-font-size", fontSize.toString());
   }, [theme, fontSize]);
+
+  // PERSISTENCE LOGIC
+  // These functions update the state AND localStorage (Saving "for good")
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    localStorage.setItem("app-theme", newTheme);
+  };
+
+  const setFontSize = (newSize: number) => {
+    setFontSizeState(newSize);
+    localStorage.setItem("app-font-size", newSize.toString());
+  };
 
   return (
     <ThemeProviderContext.Provider value={{ theme, fontSize, setTheme, setFontSize }}>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/theme-provider";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -16,17 +16,63 @@ import { Palette } from "lucide-react";
 import { toast } from "sonner";
 
 export function Settings() {
+  // Global "Source of Truth" from Context
   const { theme, setTheme, fontSize, setFontSize } = useTheme();
 
-  const [originalSettings, setOriginalSettings] = useState({ theme, fontSize });
+  // Local "Draft" state for Previewing changes
+  const [previewTheme, setPreviewTheme] = useState(theme);
+  const [previewFontSize, setPreviewFontSize] = useState(fontSize);
+
+  // Create a flag to track if we saved
+  const isSaved = useRef(false);
+
+  /**
+   * LIVE PREVIEW EFFECT
+   * This updates the DOM visually while the user interacts with sliders/buttons,
+   * but it does NOT trigger the localStorage save logic in the Provider.
+   */
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    // Apply Preview Theme
+    root.classList.remove("light", "dark");
+    root.classList.add(previewTheme);
+
+    // Apply Preview Font Size
+    root.style.setProperty("--font-size", `${previewFontSize}px`);
+
+    // 2. CLEANUP FUNCTION (Runs when leaving the page)
+    return () => {
+      // ONLY revert if the user DID NOT click save
+      if (!isSaved.current) {
+        root.classList.remove("light", "dark");
+        root.classList.add(theme);
+        root.style.setProperty("--font-size", `${fontSize}px`);
+      }
+    };
+  }, [previewTheme, previewFontSize, theme, fontSize]);
+
   const handleSave = () => {
-    setOriginalSettings({ theme, fontSize });
+    isSaved.current = true; // 3. Set the flag to true
+    // Commit the draft values to the Global Provider
+    // This is what triggers the localStorage.setItem calls
+    setTheme(previewTheme);
+    setFontSize(previewFontSize);
     toast.success("Settings saved successfully");
   };
 
   const handleCancel = () => {
-    setTheme(originalSettings.theme);
-    setFontSize(originalSettings.fontSize);
+    // Reset local drafts back to the last saved global state
+    setPreviewTheme(theme);
+    setPreviewFontSize(fontSize);
+
+    // Explicitly revert the DOM visuals immediately
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(theme);
+    root.style.setProperty("--font-size", `${fontSize}px`);
+
+    toast.info("Changes discarded");
   };
 
   return (
@@ -79,8 +125,8 @@ export function Settings() {
               </div>
             <Slider
               id="fontSize"
-              value={[fontSize]} // Ensure this is an array of numbers
-              onValueChange={(value: number[]) => setFontSize(value[0])} // Explicitly define the type
+              value={[previewFontSize]} // Linked to Preview
+              onValueChange={(value) => setPreviewFontSize(value[0])} // Updates Preview
               min={12}
               max={24}
               step={1}
@@ -88,12 +134,12 @@ export function Settings() {
             />
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">
-                  Current size: {fontSize}px
+                  Preview size: {previewFontSize}px
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setFontSize(16)}
+                  onClick={() => setPreviewFontSize(16)}
                 >
                   Reset to default
                 </Button>
@@ -102,7 +148,7 @@ export function Settings() {
               {/* Live Preview */}
               <div className="mt-4 p-4 rounded-lg bg-muted">
                 <p className="text-sm text-muted-foreground mb-2">Live Preview:</p>
-                <div style={{ fontSize: `${fontSize}px` }}>
+                <div style={{ fontSize: `${previewFontSize}px` }}>
                   <p>This is how your text will appear with the selected font size.</p>
                   <p className="mt-2">Sample heading text for preview</p>
                 </div>
@@ -124,7 +170,7 @@ export function Settings() {
             </div>
 
             <div className="space-y-4">
-              <Select value={theme} onValueChange={setTheme}>
+              <Select value={previewTheme} onValueChange={(val: "light" | "dark") => setPreviewTheme(val)}>
                 <SelectTrigger id="theme" className="w-full max-w-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -137,9 +183,9 @@ export function Settings() {
               {/* Theme Preview */}
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => setTheme("light")}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    theme === "light"
+                  onClick={() => setPreviewTheme("light")}
+                  className={`p-4 rounded-lg border-2 transition-all${
+                    previewTheme === "light"
                       ? "border-primary ring-2 ring-primary/20"
                       : "border-border hover:border-primary/50"
                   }`}
@@ -156,9 +202,9 @@ export function Settings() {
                 </button>
 
                 <button
-                  onClick={() => setTheme("dark")}
+                  onClick={() => setPreviewTheme("dark")}
                   className={`p-4 rounded-lg border-2 transition-all ${
-                    theme === "dark"
+                    previewTheme === "dark"
                       ? "border-primary ring-2 ring-primary/20"
                       : "border-border hover:border-primary/50"
                   }`}

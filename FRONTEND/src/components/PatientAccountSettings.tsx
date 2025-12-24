@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabaseClient";
@@ -19,7 +19,17 @@ export function PatientAccountSettings() {
   const navigate = useNavigate();
   
   const { profile, session, refreshProfile } = useAuth();
+
+  // Global "Source of Truth" from Context
   const { theme, setTheme, fontSize, setFontSize } = useTheme();
+
+  // Local "Draft" state for Previewing changes
+  const [previewTheme, setPreviewTheme] = useState(theme);
+  const [previewFontSize, setPreviewFontSize] = useState(fontSize);
+
+  // Create a flag to track if we saved
+  const isSaved = useRef(false);
+
   // State for UI and Form Data
   const [activeSection, setActiveSection] = useState("account");
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +42,29 @@ export function PatientAccountSettings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-  const [originalSettings, setOriginalSettings] = useState({ theme, fontSize });
+  /**
+   * LIVE PREVIEW EFFECT
+   * Updates the DOM visually while the user interacts with sliders/buttons.
+   * This does NOT trigger the localStorage save logic in the Provider.
+   */
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(previewTheme);
+    root.style.setProperty("--font-size", `${previewFontSize}px`);
+
+  // CLEANUP FUNCTION (Runs when leaving the page)
+return () => {
+      // ONLY revert if the user DID NOT click save
+      if (!isSaved.current) {
+        root.classList.remove("light", "dark");
+        root.classList.add(theme);
+        root.style.setProperty("--font-size", `${fontSize}px`);
+      }
+    };
+  }, [previewTheme, previewFontSize, theme, fontSize]);
+
+  // Load Profile Data Effect
   useEffect(() => {
     if (session?.user) {
       // Helper to bypass TypeScript checks for fields that exist in API but not in Interface
@@ -123,15 +155,24 @@ export function PatientAccountSettings() {
 
   // --- Accessibility Logic ---
   const handleSaveDisplay = () => {
-    setOriginalSettings({ theme, fontSize });
-    // LocalStorage saving is handled automatically by ThemeProvider's useEffect
+    isSaved.current = true; // 3. Set the flag to true
+    // Commit the draft values to the Global Provider & LocalStorage
+    setTheme(previewTheme);
+    setFontSize(previewFontSize);
     toast.success("Display settings saved successfully");
   };
 
   const handleCancelDisplay = () => {
-    // Revert global settings to original state
-    setTheme(originalSettings.theme as "light" | "dark");
-    setFontSize(originalSettings.fontSize);
+    // Reset local drafts back to the last saved global state
+    setPreviewTheme(theme);
+    setPreviewFontSize(fontSize);
+
+    // Explicitly revert the DOM visuals immediately
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(theme);
+    root.style.setProperty("--font-size", `${fontSize}px`);
+    toast.info("Changes discarded");
   };
 
   const categories = [
@@ -276,16 +317,16 @@ export function PatientAccountSettings() {
                             <span className="text-sm text-muted-foreground">Large</span>
                         </div>
                         <Slider
-                            id="fontSize" value={[fontSize]} onValueChange={(value: number[]) => setFontSize(value[0])}
+                            id="fontSize" value={[previewFontSize]} onValueChange={(value) => setPreviewFontSize(value[0])}
                             min={12} max={24} step={1} className="w-full"
                         />
                         <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Current size: {fontSize}px</span>
-                            <Button variant="outline" size="sm" onClick={() => setFontSize(16)}>Reset to default</Button>
+                            <span className="text-sm font-medium">Preview size: {previewFontSize}px</span>
+                            <Button variant="outline" size="sm" onClick={() => setPreviewFontSize(16)}>Reset to default</Button>
                         </div>
                         <div className="mt-4 p-4 rounded-lg bg-muted">
                             <p className="text-sm text-muted-foreground mb-2">Live Preview:</p>
-                            <div style={{ fontSize: `${fontSize}px` }}>
+                            <div style={{ fontSize: `${previewFontSize}px` }}>
                                 <p>This is how your text will appear with the selected font size.</p>
                                 <p className="mt-2">Sample heading text for preview</p>
                             </div>
@@ -299,7 +340,7 @@ export function PatientAccountSettings() {
                         <p className="text-sm text-muted-foreground mt-1">Choose between light and dark mode</p>
                     </div>
                     <div className="space-y-4">
-                        <Select value={theme} onValueChange={setTheme}>
+                        <Select value={previewTheme} onValueChange={(val: "light" | "dark") => setPreviewTheme(val)}>
                             <SelectTrigger id="theme" className="w-full max-w-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="light">Light Mode</SelectItem>
@@ -308,8 +349,8 @@ export function PatientAccountSettings() {
                         </Select>
                         <div className="mt-4 grid grid-cols-2 gap-4">
                             <button
-                                onClick={() => setTheme("light")}
-                                className={`p-4 rounded-lg border-2 transition-all ${theme === "light" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
+                                onClick={() => setPreviewTheme("light")}
+                                className={`p-4 rounded-lg border-2 transition-all ${previewTheme === "light" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
                             >
                                 <div className="space-y-2">
                                     <div className="h-16 bg-white rounded border border-gray-200 flex items-center justify-center">
@@ -322,8 +363,8 @@ export function PatientAccountSettings() {
                                 </div>
                             </button>
                             <button
-                                onClick={() => setTheme("dark")}
-                                className={`p-4 rounded-lg border-2 transition-all ${theme === "dark" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
+                                onClick={() => setPreviewTheme("dark")}
+                                className={`p-4 rounded-lg border-2 transition-all ${previewTheme === "dark" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
                             >
                                 <div className="space-y-2">
                                     <div className="h-16 bg-gray-900 rounded border border-gray-700 flex items-center justify-center">
