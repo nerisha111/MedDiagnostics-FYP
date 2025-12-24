@@ -32,7 +32,7 @@ export function PatientAccountSettings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-  const [originalSettings] = useState({ theme, fontSize });
+  const [originalSettings, setOriginalSettings] = useState({ theme, fontSize });
   useEffect(() => {
     if (session?.user) {
       // Helper to bypass TypeScript checks for fields that exist in API but not in Interface
@@ -123,6 +123,7 @@ export function PatientAccountSettings() {
 
   // --- Accessibility Logic ---
   const handleSaveDisplay = () => {
+    setOriginalSettings({ theme, fontSize });
     // LocalStorage saving is handled automatically by ThemeProvider's useEffect
     toast.success("Display settings saved successfully");
   };

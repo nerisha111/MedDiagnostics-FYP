@@ -18,9 +18,9 @@ import { toast } from "sonner";
 export function Settings() {
   const { theme, setTheme, fontSize, setFontSize } = useTheme();
 
-  const [originalSettings] = useState({ theme, fontSize });
-
+  const [originalSettings, setOriginalSettings] = useState({ theme, fontSize });
   const handleSave = () => {
+    setOriginalSettings({ theme, fontSize });
     toast.success("Settings saved successfully");
   };
 
