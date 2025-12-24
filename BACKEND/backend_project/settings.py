@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'a-default-secret-key-for-safety')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = [ 'med.curiouskit.dev']
+ALLOWED_HOSTS = [ '127.0.0.1', 'med.curiouskit.dev']
 
 # Application definition
 INSTALLED_APPS = [

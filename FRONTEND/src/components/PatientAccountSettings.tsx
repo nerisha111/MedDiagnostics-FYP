@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabaseClient";
+import { useTheme } from "../context/theme-provider";
 
 // UI Components
 import { Card } from "./ui/card";
@@ -18,7 +19,7 @@ export function PatientAccountSettings() {
   const navigate = useNavigate();
   
   const { profile, session, refreshProfile } = useAuth();
-  
+  const { theme, setTheme, fontSize, setFontSize } = useTheme();
   // State for UI and Form Data
   const [activeSection, setActiveSection] = useState("account");
   const [isLoading, setIsLoading] = useState(true);
@@ -31,10 +32,7 @@ export function PatientAccountSettings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-  const [fontSize, setFontSize] = useState(16);
-  const [theme, setTheme] = useState("light");
- 
-  // --- Load Data Effect ---
+  const [originalSettings] = useState({ theme, fontSize });
   useEffect(() => {
     if (session?.user) {
       // Helper to bypass TypeScript checks for fields that exist in API but not in Interface
@@ -124,20 +122,15 @@ export function PatientAccountSettings() {
   };
 
   // --- Accessibility Logic ---
-  useEffect(() => {
-    document.documentElement.style.setProperty("--font-size", `${fontSize}px`);
-  }, [fontSize]);
-
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
-
   const handleSaveDisplay = () => {
+    // LocalStorage saving is handled automatically by ThemeProvider's useEffect
     toast.success("Display settings saved successfully");
+  };
+
+  const handleCancelDisplay = () => {
+    // Revert global settings to original state
+    setTheme(originalSettings.theme as "light" | "dark");
+    setFontSize(originalSettings.fontSize);
   };
 
   const categories = [
@@ -346,7 +339,7 @@ export function PatientAccountSettings() {
                 </div>
                 <Separator />
                 <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
+                  <Button variant="outline" onClick={handleCancelDisplay}>Cancel</Button>
                   <Button onClick={handleSaveDisplay} className="bg-primary hover:bg-primary/90">Save Changes</Button>
                 </div>
               </Card>
