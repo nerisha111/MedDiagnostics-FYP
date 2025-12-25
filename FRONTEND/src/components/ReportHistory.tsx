@@ -512,7 +512,7 @@ export function ReportHistory() {
         </div>
 
         {/* Search and Filters */}
-        <Card className="p-4 bg-white shadow-sm">
+        <Card className="p-4 bg-card shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -578,7 +578,7 @@ export function ReportHistory() {
         </Card>
 
         {/* Reports Table */}
-        <Card className="bg-white shadow-sm overflow-hidden">
+        <Card className="bg-card shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 border-b">
@@ -692,7 +692,7 @@ export function ReportHistory() {
         </Card>
 
         {/* Pagination */}
-        <Card className="p-4 bg-white shadow-sm">
+        <Card className="p-4 bg-card shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600">
               Showing {filteredReports.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredReports.length)} of {filteredReports.length} reports
