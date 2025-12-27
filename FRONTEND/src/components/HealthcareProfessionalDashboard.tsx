@@ -631,6 +631,7 @@ export function HealthcareProfessionalDashboard() {
               <TableCell>
      
                 <Badge
+                  style={{ minWidth: '10em' }}
                   className={`
                     flex items-center w-fit gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-colors
                     ${item.status === 'pending'
