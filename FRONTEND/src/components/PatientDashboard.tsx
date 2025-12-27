@@ -190,7 +190,7 @@ export function DashboardHome() {
           Quick Actions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/reports')}>
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-card" onClick={() => navigate('/patient/reports')}>
             <CardContent className="pt-6 pb-6">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="p-4 bg-blue-50 text-blue-600 rounded-full">
@@ -204,7 +204,7 @@ export function DashboardHome() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/history')}>
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-card" onClick={() => navigate('/patient/history')}>
             <CardContent className="pt-6 pb-6">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="p-4 bg-purple-50 text-purple-600 rounded-full">
@@ -218,7 +218,7 @@ export function DashboardHome() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/settings')}>
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-card" onClick={() => navigate('/patient/settings')}>
             <CardContent className="pt-6 pb-6">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="p-4 bg-slate-50 text-slate-600 rounded-full">
@@ -232,7 +232,7 @@ export function DashboardHome() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-white" onClick={() => navigate('/patient/help')}>
+          <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 bg-card" onClick={() => navigate('/patient/help')}>
             <CardContent className="pt-6 pb-6">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="p-4 bg-green-50 text-green-600 rounded-full">

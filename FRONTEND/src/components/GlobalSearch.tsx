@@ -114,7 +114,7 @@ export function GlobalSearch({
       };
 
       const res = await fetch(
-        "http://localhost:8000/api/diagnoses/with-feedback/",
+        "/api/diagnoses/with-feedback/",
         { headers }
       );
 

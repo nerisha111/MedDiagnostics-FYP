@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'a-default-secret-key-for-safety')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []  
+ALLOWED_HOSTS = [ '127.0.0.1', 'med.curiouskit.dev']
 
 # Application definition
 INSTALLED_APPS = [
@@ -101,11 +101,11 @@ ASGI_APPLICATION = 'backend_project.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'HOST': os.getenv('DB_HOST', 'aws-1-eu-north-1.pooler.supabase.com'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'NAME': os.getenv('DB_NAME', 'postgres'),
-        'USER': os.getenv('DB_USER', 'postgres.oqgvbmsrhnrwsxwfnfbw'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'N0L9xInbzLaieb2y'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
         'OPTIONS': {
             'sslmode': 'require',
         },

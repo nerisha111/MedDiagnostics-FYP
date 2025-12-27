@@ -78,8 +78,8 @@ export function PatientHistory() {
 
       //parallel fetch for performance optimizaton
       const [historyResponse, statsResponse] = await Promise.all([
-        fetch("http://localhost:8000/api/patient/activity/history/", { headers }),
-        fetch("http://localhost:8000/api/patient/activity/stats/", { headers }),
+        fetch("/api/patient/activity/history/", { headers }),
+        fetch("/api/patient/activity/stats/", { headers }),
       ]);
 
       if (!historyResponse.ok || !statsResponse.ok) {

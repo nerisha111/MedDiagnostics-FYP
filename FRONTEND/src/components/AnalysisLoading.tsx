@@ -70,7 +70,7 @@ export function AnalysisLoading() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("User not authenticated.");
 
-        const response = await axios.get<CaseData>(`http://127.0.0.1:8000/api/cases/${caseId}/`, {
+        const response = await axios.get<CaseData>(`/api/cases/${caseId}/`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
         const caseData = response.data;

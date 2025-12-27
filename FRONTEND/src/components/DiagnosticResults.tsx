@@ -185,7 +185,7 @@ export function DiagnosticResults({ onFeedback }: DiagnosticResultsProps = {}) {
       };
 
       // 3. Send Request
-      const API_URL = `${import.meta.env.VITE_API_URL || ''}/api/diagnosis/save/`; 
+      const API_URL = `/api/diagnosis/save/`;
       
       console.log("Auto-saving diagnosis to:", API_URL);
 

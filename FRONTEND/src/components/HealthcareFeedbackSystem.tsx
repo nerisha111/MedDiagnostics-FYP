@@ -74,7 +74,7 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/with-feedback/`, {
+      const response = await fetch(`/api/diagnoses/with-feedback/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch feedback data.");
@@ -101,7 +101,7 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/${diagnosisId}/`, {
+      const response = await fetch(`/api/diagnoses/${diagnosisId}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch diagnosis details.");
@@ -124,7 +124,7 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/feedback/diagnosis/${diagnosisId}/`, {
+      const response = await fetch(`/api/feedback/diagnosis/${diagnosisId}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch feedback details.");

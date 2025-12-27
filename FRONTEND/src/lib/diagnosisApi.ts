@@ -37,7 +37,6 @@ export async function saveDiagnosisToDatabase(
   aiResponse: AIResponse,
   accessToken: string
 ): Promise<{ diagnosis_id: string; recommendations_count: number }> {
-  const apiUrl = import.meta.env.VITE_API_URL;
   
   // Extract and format recommendations from AI response
   const extractedRecommendations: Array<{
@@ -91,7 +90,7 @@ export async function saveDiagnosisToDatabase(
   console.log(' Saving diagnosis to database:', payload);
   
   // Make the API call
-  const response = await fetch(`${apiUrl}/api/diagnoses/save-complete/`, {
+  const response = await fetch(`/api/diagnoses/save-complete/`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,

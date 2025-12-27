@@ -71,12 +71,11 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // --- Configuration ---
-const API_BASE_URL = "http://localhost:8000/api"; 
 const API_ENDPOINTS = {
-  DIAGNOSES_LIST: `${API_BASE_URL}/diagnoses/with-feedback/`,
-  FEEDBACK_STATS: `${API_BASE_URL}/feedback/stats/`,
-  DIAGNOSIS_DETAIL: (id: string) => `${API_BASE_URL}/diagnoses/${id}/`,
-  FEEDBACK_DETAIL: (id: string) => `${API_BASE_URL}/feedback/diagnosis/${id}/`,
+  DIAGNOSES_LIST: `/api/diagnoses/with-feedback/`,
+  FEEDBACK_STATS: `/api/feedback/stats/`,
+  DIAGNOSIS_DETAIL: (id: string) => `/api/diagnoses/${id}/`,
+  FEEDBACK_DETAIL: (id: string) => `/api/feedback/diagnosis/${id}/`,
 };
 
 // --- Interfaces ---

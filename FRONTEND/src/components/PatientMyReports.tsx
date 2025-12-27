@@ -91,7 +91,7 @@ export function PatientMyReports() {
     setLoading(true);
     try {
       //secure API call with Bearer token
-      const response = await axios.get('http://127.0.0.1:8000/api/patients/reports/', {
+      const response = await axios.get('/api/patients/reports/', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       
@@ -110,7 +110,7 @@ export function PatientMyReports() {
     setLoadingDetail(true);
     try {
       const response = await axios.get(
-        `http://127.0.0.1:8000/api/patients/reports/${diagnosisId}/`,
+        `/api/patients/reports/${diagnosisId}/`,
         { headers: { 'Authorization': `Bearer ${session.access_token}` } }
       );
       

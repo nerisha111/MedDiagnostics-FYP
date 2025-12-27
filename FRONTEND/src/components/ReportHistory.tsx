@@ -90,7 +90,7 @@ export function ReportHistory() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("Not authenticated");
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/with-feedback/`, {
+        const response = await fetch(`/api/diagnoses/with-feedback/`, {
           headers: { "Authorization": `Bearer ${session.access_token}` },
         });
 
@@ -169,7 +169,7 @@ export function ReportHistory() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/${reportId}/`, {
+      const response = await fetch(`/api/diagnoses/${reportId}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
       
@@ -195,7 +195,7 @@ export function ReportHistory() {
       if (!session) throw new Error("Not authenticated");
 
       // 1. Fetch Full Details (needed for description and recommendations)
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/diagnoses/${report.id}/`, {
+      const response = await fetch(`/api/diagnoses/${report.id}/`, {
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
 
@@ -512,7 +512,7 @@ export function ReportHistory() {
         </div>
 
         {/* Search and Filters */}
-        <Card className="p-4 bg-white shadow-sm">
+        <Card className="p-4 bg-card shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -578,7 +578,7 @@ export function ReportHistory() {
         </Card>
 
         {/* Reports Table */}
-        <Card className="bg-white shadow-sm overflow-hidden">
+        <Card className="bg-card shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 border-b">
@@ -692,7 +692,7 @@ export function ReportHistory() {
         </Card>
 
         {/* Pagination */}
-        <Card className="p-4 bg-white shadow-sm">
+        <Card className="p-4 bg-card shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600">
               Showing {filteredReports.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredReports.length)} of {filteredReports.length} reports
