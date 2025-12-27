@@ -4,13 +4,13 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Separator } from "./ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+// CHANGE 1: Added DialogDescription to imports
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { FileText, CheckCircle2, Clock, Activity, AlertCircle, MessageSquare, Star, Calendar, FlaskConical, Pill } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from '../supabaseClient';
 
 // INTERFACES
-
 
 interface Recommendation {
   id: string;
@@ -19,7 +19,6 @@ interface Recommendation {
   type: string | null;
   description: string | null;
 }
-
 
 interface DiagnosisDetailResponse {
   id: string;
@@ -32,7 +31,6 @@ interface DiagnosisDetailResponse {
   recommendations: Recommendation[]; 
 }
 
-
 interface FullFeedbackDetails {
   id: string;
   diagnosis_details: {
@@ -44,7 +42,6 @@ interface FullFeedbackDetails {
   next_steps_rating: number | null;
   general_comments: string | null;
 }
-
 
 interface HealthcareFeedbackSystemProps {
   onProvideFeedback: (diagnosisId: string) => void;
@@ -208,205 +205,211 @@ export function HealthcareFeedbackSystem({ onProvideFeedback }: HealthcareFeedba
 
   
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        {/* Adjusted width to match the sample screenshot - using sm:max-w-lg instead of sm:max-w-2xl */}
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
           {isModalLoading ? (
-            <div className="flex items-center justify-center h-64"><Activity className="w-8 h-8 animate-spin text-primary" /></div>
+            <div className="flex items-center justify-center h-64">
+                {/* CHANGE 2: Added invisible Title/Description for Loading State to prevent console errors */}
+                <DialogTitle className="sr-only">Loading</DialogTitle>
+                <DialogDescription className="sr-only">Loading details, please wait.</DialogDescription>
+                <Activity className="w-8 h-8 animate-spin text-primary" />
+            </div>
           ) : (
             <>
               {modalContentType === 'diagnosis' && selectedDiagnosis && (
-  <>
-    <DialogHeader className="flex-shrink-0">
-      <DialogTitle>View Details</DialogTitle>
-      <p className="text-sm text-muted-foreground">A summary of the AI's diagnostic analysis.</p>
-    </DialogHeader>
-    <div className="grid gap-6 py-4 overflow-y-auto flex-1 pr-2">
-      <div className="space-y-2">
-  <label className="text-sm font-medium text-muted-foreground">Chief Complaint</label>
-  <p className="text-base p-4 bg-muted/50 rounded-lg border">
-    {(() => {
-      const badValues = ['not specified', 'null', 'none', '', 'general consultation', 'no description recorded', 'no description recorded.'];
-      
-      // Priority 1: Check chief_complaint from diagnostic_case
-      if (selectedDiagnosis.diagnostic_case?.chief_complaint) {
-        const complaint = String(selectedDiagnosis.diagnostic_case.chief_complaint).trim();
-        if (complaint && !badValues.includes(complaint.toLowerCase())) {
-          return complaint;
-        }
-      }
-      
-      // Priority 2: Check description from diagnostic_case
-      if (selectedDiagnosis.diagnostic_case?.description) {
-        const desc = String(selectedDiagnosis.diagnostic_case.description).trim();
-        if (desc && !badValues.includes(desc.toLowerCase())) {
-          return desc;
-        }
-      }
-      
-      // Fallback
-      return "No chief complaint recorded.";
-    })()}
-  </p>
-</div>
-      
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Primary Diagnosis</label>
-        <p className="font-semibold text-lg">{selectedDiagnosis.name}</p>
-      </div>
-      
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">AI Confidence</label>
-        <p className="font-bold text-xl text-primary">{selectedDiagnosis.confidence}%</p>
-      </div>
-      
-     
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
-        <div className="p-4 bg-muted/50 rounded-lg border">
-          {(() => {
-            // Filter based on actual database categories
-            const tests = selectedDiagnosis.recommendations.filter(r => {
-              // Use the category field from database
-              const categoryLower = (r.category || '').toLowerCase();
-              const typeLower = (r.type || '').toLowerCase();
-              
-              return (
-                categoryLower.includes('diagnostic') ||
-                categoryLower.includes('imaging') ||
-                categoryLower.includes('cardiac monitoring') ||
-                typeLower === 'test' ||
-                categoryLower === 'imaging test'
-              );
-            });
-
-            return tests.length > 0 ? (
-              <div className="space-y-2">
-                {tests.map((test, index) => (
-                  <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
-                    <FlaskConical className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{test.name}</p>
-                      {test.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{test.description}</p>
-                      )}
-                      <div className="flex gap-2 mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {test.category}
-                        </Badge>
-                        {test.type && (
-                          <Badge variant="outline" className="text-xs">
-                            {test.type}
-                          </Badge>
-                        )}
-                      </div>
+                <>
+                    <DialogHeader className="flex-shrink-0">
+                    <DialogTitle>View Details</DialogTitle>
+                    {/* CHANGE 3: Swapped <p> for <DialogDescription> */}
+                    <DialogDescription>A summary of the AI's diagnostic analysis.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-6 py-4 overflow-y-auto flex-1 pr-2">
+                    <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Chief Complaint</label>
+                <p className="text-base p-4 bg-muted/50 rounded-lg border">
+                    {(() => {
+                    const badValues = ['not specified', 'null', 'none', '', 'general consultation', 'no description recorded', 'no description recorded.'];
+                    
+                    // Priority 1: Check chief_complaint from diagnostic_case
+                    if (selectedDiagnosis.diagnostic_case?.chief_complaint) {
+                        const complaint = String(selectedDiagnosis.diagnostic_case.chief_complaint).trim();
+                        if (complaint && !badValues.includes(complaint.toLowerCase())) {
+                        return complaint;
+                        }
+                    }
+                    
+                    // Priority 2: Check description from diagnostic_case
+                    if (selectedDiagnosis.diagnostic_case?.description) {
+                        const desc = String(selectedDiagnosis.diagnostic_case.description).trim();
+                        if (desc && !badValues.includes(desc.toLowerCase())) {
+                        return desc;
+                        }
+                    }
+                    
+                    // Fallback
+                    return "No chief complaint recorded.";
+                    })()}
+                </p>
+                </div>
+                    
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Primary Diagnosis</label>
+                        <p className="font-semibold text-lg">{selectedDiagnosis.name}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
-            );
-          })()}
-        </div>
-      </div>
-
-     
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
-        <div className="p-4 bg-muted/50 rounded-lg border">
-          {(() => {
-            // Filter for treatments and medications
-            const treatments = selectedDiagnosis.recommendations.filter(r => {
-              const categoryLower = (r.category || '').toLowerCase();
-              const typeLower = (r.type || '').toLowerCase();
-              
-              return (
-                categoryLower === 'treatment' ||
-                categoryLower.includes('medication') ||
-                categoryLower.includes('therapeutic') ||
-                categoryLower.includes('supportive care') ||
-                typeLower === 'treatment'
-              );
-            });
-
-            return treatments.length > 0 ? (
-              <div className="space-y-2">
-                {treatments.map((treatment, index) => (
-                  <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
-                    <Pill className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{treatment.name}</p>
-                      {treatment.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{treatment.description}</p>
-                      )}
-                      <div className="flex gap-2 mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {treatment.category}
-                        </Badge>
-                        {treatment.type && (
-                          <Badge variant="outline" className="text-xs">
-                            {treatment.type}
-                          </Badge>
-                        )}
-                      </div>
+                    
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">AI Confidence</label>
+                        <p className="font-bold text-xl text-primary">{selectedDiagnosis.confidence}%</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
-            );
-          })()}
-        </div>
-      </div>
+                    
+                    
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Recommended Tests</label>
+                        <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                            // Filter based on actual database categories
+                            const tests = selectedDiagnosis.recommendations.filter(r => {
+                            // Use the category field from database
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            
+                            return (
+                                categoryLower.includes('diagnostic') ||
+                                categoryLower.includes('imaging') ||
+                                categoryLower.includes('cardiac monitoring') ||
+                                typeLower === 'test' ||
+                                categoryLower === 'imaging test'
+                            );
+                            });
 
-      {/* NEW: General Recommendations/Next Steps */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">General Recommendations</label>
-        <div className="p-4 bg-muted/50 rounded-lg border">
-          {(() => {
-            // Filter for general plans and other categories
-            const generalRecs = selectedDiagnosis.recommendations.filter(r => {
-              const categoryLower = (r.category || '').toLowerCase();
-              const typeLower = (r.type || '').toLowerCase();
-              
-              return (
-                categoryLower === 'general' ||
-                typeLower === 'plan' ||
-                (!categoryLower.includes('diagnostic') && 
-                 !categoryLower.includes('imaging') && 
-                 !categoryLower.includes('treatment') &&
-                 typeLower !== 'test')
-              );
-            });
-
-            return generalRecs.length > 0 ? (
-              <div className="space-y-2">
-                {generalRecs.map((rec, index) => (
-                  <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
-                    <Calendar className="w-4 h-4 mt-0.5 text-purple-500 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm">{rec.name}</p>
-                      {rec.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{rec.description}</p>
-                      )}
+                            return tests.length > 0 ? (
+                            <div className="space-y-2">
+                                {tests.map((test, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                    <FlaskConical className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                                    <div className="flex-1">
+                                    <p className="text-sm font-medium">{test.name}</p>
+                                    {test.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{test.description}</p>
+                                    )}
+                                    <div className="flex gap-2 mt-1">
+                                        <Badge variant="secondary" className="text-xs">
+                                        {test.category}
+                                        </Badge>
+                                        {test.type && (
+                                        <Badge variant="outline" className="text-xs">
+                                            {test.type}
+                                        </Badge>
+                                        )}
+                                    </div>
+                                    </div>
+                                </div>
+                                ))}
+                            </div>
+                            ) : (
+                            <p className="text-sm text-muted-foreground">No specific tests recommended.</p>
+                            );
+                        })()}
+                        </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : null;
-          })()}
-        </div>
-      </div>
-    </div>
-  </>
-)}
+
+                    
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Treatment Options</label>
+                        <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                            // Filter for treatments and medications
+                            const treatments = selectedDiagnosis.recommendations.filter(r => {
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            
+                            return (
+                                categoryLower === 'treatment' ||
+                                categoryLower.includes('medication') ||
+                                categoryLower.includes('therapeutic') ||
+                                categoryLower.includes('supportive care') ||
+                                typeLower === 'treatment'
+                            );
+                            });
+
+                            return treatments.length > 0 ? (
+                            <div className="space-y-2">
+                                {treatments.map((treatment, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                    <Pill className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" />
+                                    <div className="flex-1">
+                                    <p className="text-sm font-medium">{treatment.name}</p>
+                                    {treatment.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{treatment.description}</p>
+                                    )}
+                                    <div className="flex gap-2 mt-1">
+                                        <Badge variant="secondary" className="text-xs">
+                                        {treatment.category}
+                                        </Badge>
+                                        {treatment.type && (
+                                        <Badge variant="outline" className="text-xs">
+                                            {treatment.type}
+                                        </Badge>
+                                        )}
+                                    </div>
+                                    </div>
+                                </div>
+                                ))}
+                            </div>
+                            ) : (
+                            <p className="text-sm text-muted-foreground">No specific treatments recommended.</p>
+                            );
+                        })()}
+                        </div>
+                    </div>
+
+                    {/* NEW: General Recommendations/Next Steps */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">General Recommendations</label>
+                        <div className="p-4 bg-muted/50 rounded-lg border">
+                        {(() => {
+                            // Filter for general plans and other categories
+                            const generalRecs = selectedDiagnosis.recommendations.filter(r => {
+                            const categoryLower = (r.category || '').toLowerCase();
+                            const typeLower = (r.type || '').toLowerCase();
+                            
+                            return (
+                                categoryLower === 'general' ||
+                                typeLower === 'plan' ||
+                                (!categoryLower.includes('diagnostic') && 
+                                !categoryLower.includes('imaging') && 
+                                !categoryLower.includes('treatment') &&
+                                typeLower !== 'test')
+                            );
+                            });
+
+                            return generalRecs.length > 0 ? (
+                            <div className="space-y-2">
+                                {generalRecs.map((rec, index) => (
+                                <div key={index} className="flex items-start gap-2 p-2 bg-background rounded border">
+                                    <Calendar className="w-4 h-4 mt-0.5 text-purple-500 flex-shrink-0" />
+                                    <div className="flex-1">
+                                    <p className="text-sm">{rec.name}</p>
+                                    {rec.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{rec.description}</p>
+                                    )}
+                                    </div>
+                                </div>
+                                ))}
+                            </div>
+                            ) : null;
+                        })()}
+                        </div>
+                    </div>
+                    </div>
+                </>
+                )}
 
               {modalContentType === 'feedback' && selectedFeedback && (
                  <>
                   <DialogHeader>
                     <DialogTitle>View Feedback</DialogTitle>
-                    <p className="text-sm text-muted-foreground">Your submitted feedback for this diagnosis.</p>
+                    {/* CHANGE 3: Swapped <p> for <DialogDescription> */}
+                    <DialogDescription>Your submitted feedback for this diagnosis.</DialogDescription>
                   </DialogHeader>
                   <Separator />
                   <div className="space-y-6 py-4">
