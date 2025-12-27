@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { SetStateAction, useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/theme-provider";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -126,7 +126,7 @@ export function Settings() {
             <Slider
               id="fontSize"
               value={[previewFontSize]} // Linked to Preview
-              onValueChange={(value) => setPreviewFontSize(value[0])} // Updates Preview
+              onValueChange={(value: SetStateAction<number>[]) => setPreviewFontSize(value[0])} // Updates Preview
               min={12}
               max={24}
               step={1}
