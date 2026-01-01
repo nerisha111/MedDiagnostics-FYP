@@ -233,7 +233,7 @@ export function PatientDataUpload() {
       });
       
       const resultData = JSON.parse(response.data.result);
-      toast.success(`✅ Combined analysis complete! Analyzed ${resultData.dataSourcesAnalyzed?.totalFiles || allFiles.length} files`);
+      toast.success(` Combined analysis complete! Analyzed ${resultData.dataSourcesAnalyzed?.totalFiles || allFiles.length} files`);
       return resultData;
       
     } catch (error: any) {
@@ -325,7 +325,7 @@ export function PatientDataUpload() {
         let aiResult: AnalysisResult;
         
         if (allFilesForAnalysis.length > 1) {
-          toast.info("🔬 Performing comprehensive multi-modal analysis...");
+          toast.info(" Performing comprehensive multi-modal analysis...");
           aiResult = await analyzeMultipleFilesCombined(allFilesForAnalysis, patientContext, session);
         } else {
           const fileForAnalysis = allFilesForAnalysis[0];

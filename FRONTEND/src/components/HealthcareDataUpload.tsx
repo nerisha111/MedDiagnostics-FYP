@@ -295,7 +295,7 @@ export function HealthcareDataUpload() {
       
       const resultData = JSON.parse(response.data.result);
       
-      toast.success(`✅ Combined analysis complete! Analyzed ${resultData.dataSourcesAnalyzed?.totalFiles || allFiles.length} files`);
+      toast.success(` Combined analysis complete! Analyzed ${resultData.dataSourcesAnalyzed?.totalFiles || allFiles.length} files`);
       
       return resultData;
       
