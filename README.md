@@ -20,7 +20,7 @@ The application adopts a modular Model-View-Controller (MVC) architecture separa
 
 # Tech Stack
 * Frontend: React, Tailwind CSS, Axios, jsPDF, jsPDF-AutoTable
-* ackend Frameworks: FastAPI (with Uvicorn server), Django REST Framework
+* Backend Frameworks: FastAPI (with Uvicorn server), Django REST Framework
 * Database & BaaS: Supabase (PostgreSQL, Row-Level Security, pgvector, Supabase Storage buckets)
 * AI/ML: LLaVA-Med (7B Parameter Vision-Language Model), SentenceTransformers (miniLM-L6-v2 for embeddings), QLoRA (for model retraining)
 * Compute Environment: RunPod (RTX A5000 GPU, 32GB VRAM for model hosting and training)
